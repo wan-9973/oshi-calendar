@@ -1,0 +1,18 @@
+{% macro card(c) -%}
+<article class="card" data-media="{{ c.media_key }}">
+  {% if c.image %}<img src="{{ c.image }}" alt="" loading="lazy">{% endif %}
+  <div class="card-body">
+    <span class="badge">{{ c.media }}</span>
+    {% if c.is_new %}<span class="badge new">NEW</span>{% endif %}
+    <h3><a href="{{ c.url }}" rel="nofollow sponsored" target="_blank">{{ c.title }}</a></h3>
+    {% if c.author %}<p class="author">{{ c.author }}</p>{% endif %}
+    {% if c.sales_date %}<p class="date">発売日: {{ c.sales_date }}</p>{% endif %}
+    {% if c.price is not none %}
+      <p class="price">{{ "{:,}".format(c.price) }}円（税込）</p>
+    {% else %}
+      <p class="price unavailable">最新価格は楽天でご確認ください</p>
+    {% endif %}
+    <p class="fetched">[{{ c.fetched_at }}] 時点の情報</p>
+  </div>
+</article>
+{%- endmacro %}

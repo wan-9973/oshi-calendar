@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% from "_card.html" import card %}
+{% block content %}
+<section class="search-box">
+  <h1>推しの新刊・新譜・発売予定をひとつのカレンダーに</h1>
+  <form id="search-form">
+    <input id="search-input" type="text" maxlength="100"
+           placeholder="推しの名前（作家・アーティスト・声優など）" required>
+    <button type="submit">検索</button>
+  </form>
+  <div id="search-progress" hidden>
+    <progress id="search-bar" max="8" value="0"></progress>
+    <p id="search-message">検索を開始しています</p>
+    <p class="note">はじめて検索される推しは、7つの媒体を順番に調べるため30秒ほどかかります。</p>
+  </div>
+  <p id="search-error" class="error" hidden></p>
+</section>
+
+<section>
+  <h2>今週の新着</h2>
+  {% if new_items %}<div class="grid">{% for c in new_items %}{{ card(c) }}{% endfor %}</div>
+  {% else %}<p class="empty">新着はまだありません。推しを検索してみてください。</p>{% endif %}
+</section>
+
+<section>
+  <h2>今後の発売カレンダー（全体・60日）</h2>
+  {% if upcoming %}<div class="grid">{% for c in upcoming %}{{ card(c) }}{% endfor %}</div>
+  {% else %}<p class="empty">発売予定はまだありません。</p>{% endif %}
+</section>
+{% endblock %}

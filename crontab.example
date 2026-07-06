@@ -1,0 +1,5 @@
+# 推しカレンダー 運用ジョブ（サーバーのタイムゾーンはJST想定）
+# 日次巡回: 深夜帯に1時間枠で実行（R1: 直列1.2秒間隔はコード側で保証）
+0 3 * * * cd /path/to/oshi-calendar && /usr/bin/python3 -m src.crawler >> logs/crawler.log 2>&1
+# 日次キャッシュ失効: R2(24h)/R3(90d)
+30 2 * * * cd /path/to/oshi-calendar && /usr/bin/python3 -m src.retention >> logs/retention.log 2>&1

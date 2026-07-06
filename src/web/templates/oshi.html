@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% from "_card.html" import card %}
+{% block title %}{{ oshi.name }} - {{ site_name }}{% endblock %}
+{% block content %}
+<h1>{{ oshi.name }} の供給カレンダー</h1>
+<p><button id="fav-btn" data-oshi-id="{{ oshi.id }}" data-oshi-name="{{ oshi.name }}">☆ マイ推しリストに追加</button></p>
+
+<section class="calendar">
+  <h2>
+    <a href="/oshi/{{ oshi.id }}?y={{ prev.y }}&m={{ prev.m }}">&laquo;</a>
+    {{ year }}年{{ month }}月
+    <a href="/oshi/{{ oshi.id }}?y={{ next.y }}&m={{ next.m }}">&raquo;</a>
+  </h2>
+  {% if calendar %}
+    <dl class="cal-list">
+    {% for day, cs in calendar | dictsort %}
+      <dt>{% if day == 0 %}{{ month }}月中（日付未確定）{% else %}{{ month }}/{{ day }}{% endif %}</dt>
+      {% for c in cs %}<dd>{{ card(c) }}</dd>{% endfor %}
+    {% endfor %}
+    </dl>
+  {% else %}<p class="empty">この月の発売予定はありません。</p>{% endif %}
+</section>
+
+<section>
+  <h2>媒体別</h2>
+  <div class="tabs">
+    <button class="tab active" data-tab="all">すべて</button>
+    {% for key, label in tabs %}<button class="tab" data-tab="{{ key }}">{{ label }}</button>{% endfor %}
+  </div>
+  <div class="grid" id="tab-grid">{% for c in cards %}{{ card(c) }}{% endfor %}</div>
+</section>
+
+<section>
+  <h2>新着順</h2>
+  <div class="grid">{% for c in newest %}{{ card(c) }}{% endfor %}</div>
+</section>
+{% endblock %}

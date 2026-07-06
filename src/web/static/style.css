@@ -1,0 +1,30 @@
+:root { --accent:#bf0000; --bg:#fffdf8; --ink:#333; --muted:#888; --line:#e8e0d5; }
+* { box-sizing:border-box; }
+body { margin:0; font-family:"Hiragino Sans","Noto Sans JP",sans-serif; background:var(--bg); color:var(--ink); }
+.site-header { display:flex; justify-content:space-between; align-items:center; padding:12px 20px; border-bottom:2px solid var(--accent); }
+.logo { font-weight:bold; font-size:1.2rem; color:var(--accent); text-decoration:none; }
+main { max-width:960px; margin:0 auto; padding:16px; }
+.search-box { text-align:center; padding:24px 0; }
+.search-box input { width:min(420px,80%); padding:10px; border:1px solid var(--line); border-radius:6px; }
+.search-box button { padding:10px 20px; background:var(--accent); color:#fff; border:none; border-radius:6px; cursor:pointer; }
+.grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:12px; }
+.card { border:1px solid var(--line); border-radius:8px; background:#fff; overflow:hidden; }
+.card img { width:100%; height:160px; object-fit:contain; background:#fafafa; }
+.card-body { padding:10px; }
+.card h3 { font-size:0.95rem; margin:6px 0; }
+.card a { color:var(--ink); }
+.badge { display:inline-block; font-size:0.7rem; background:#eee; border-radius:4px; padding:2px 6px; }
+.badge.new { background:var(--accent); color:#fff; }
+.author,.date { font-size:0.8rem; color:var(--muted); margin:2px 0; }
+.price { font-weight:bold; color:var(--accent); margin:4px 0; }
+.price.unavailable { font-weight:normal; font-size:0.78rem; color:var(--muted); }
+.fetched { font-size:0.7rem; color:var(--muted); margin:4px 0 0; }
+.tabs { margin:8px 0; }
+.tab { padding:6px 12px; margin-right:4px; border:1px solid var(--line); background:#fff; border-radius:16px; cursor:pointer; }
+.tab.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+.cal-list dt { font-weight:bold; margin-top:12px; border-bottom:1px solid var(--line); }
+.cal-list dd { margin:8px 0 8px 12px; }
+.empty,.note { color:var(--muted); font-size:0.9rem; }
+.error { color:var(--accent); }
+.site-footer { border-top:1px solid var(--line); margin-top:32px; padding:16px 20px; font-size:0.78rem; color:var(--muted); }
+#search-progress progress { width:min(420px,80%); }
