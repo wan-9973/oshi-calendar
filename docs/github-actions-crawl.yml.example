@@ -1,6 +1,6 @@
 # 任意: Vercel Hobbyのcron（1日1回×2本）では巡回容量が足りなくなった場合に、
 # GitHub Actionsから10分おきに巡回エンドポイントを叩いて増枠する。
-# 有効化: このファイルを crawl.yml にリネームし、リポジトリのSecretsに
+# 有効化: このファイルを .github/workflows/crawl.yml に配置し、リポジトリのSecretsに
 #   APP_URL（例: https://oshi-calendar.vercel.app）と CRON_SECRET を登録。
 name: crawl
 on:
