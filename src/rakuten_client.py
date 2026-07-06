@@ -112,7 +112,10 @@ class RakutenClient:
             q["affiliateId"] = config.RAKUTEN_AFFILIATE_ID
 
         headers = {}
-        if config.SITE_URL:  # 「許可されたWebサイト」との突合に備えRefererを明示
+        if config.SITE_URL:
+            # 2026年版APIは「許可されたWebサイト」(origins)とOrigin/Refererを突合する。
+            # 登録ドメインをOrigin(スキーム+ホスト)とRefererの両方で明示する。
+            headers["Origin"] = config.SITE_URL.rstrip("/")
             headers["Referer"] = config.SITE_URL
         for attempt in range(config.MAX_RETRIES):
             self.rate_limiter.wait()
