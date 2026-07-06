@@ -25,6 +25,14 @@ def _first(item: dict, *keys: str, default: str = "") -> Any:
     return default
 
 
+def _to_int(v) -> int | None:
+    """API応答の数値フィールドは空文字・文字列数値が混在するため安全に変換（Postgres対策）。"""
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return None
+
+
 def _image(item: dict) -> str:
     v = _first(item, "largeImageUrl", "mediumImageUrl", "smallImageUrl")
     if v:
@@ -52,7 +60,8 @@ def _normalize(api: str, media: str, item: dict, trusted: bool) -> Optional[dict
         return None
     raw_date = str(_first(item, "salesDate", "releaseDate"))
     iso, precision = parse_sales_date(raw_date)
-    price = item.get("itemPrice")
+    price = _to_int(item.get("itemPrice"))
+    availability = _to_int(item.get("availability"))
     return {
         "source_api": api,
         "media": media,
@@ -66,8 +75,8 @@ def _normalize(api: str, media: str, item: dict, trusted: bool) -> Optional[dict
         "sales_date_precision": precision,
         "item_url": url,
         "image_url": _image(item),
-        "price": int(price) if isinstance(price, (int, float)) else None,
-        "availability": item.get("availability"),
+        "price": price,
+        "availability": availability,
         "trusted_field_match": trusted,
     }
 
