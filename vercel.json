@@ -1,13 +1,27 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
-    "api/index.py": { "maxDuration": 60 }
+    "api/index.py": {
+      "maxDuration": 60
+    }
   },
   "rewrites": [
-    { "source": "/(.*)", "destination": "/api/index" }
+    {
+      "source": "/(.*)",
+      "destination": "/api/index"
+    }
   ],
   "crons": [
-    { "path": "/api/cron/retention", "schedule": "30 17 * * *" },
-    { "path": "/api/cron/crawl", "schedule": "0 18 * * *" }
+    {
+      "path": "/api/cron/retention",
+      "schedule": "30 17 * * *"
+    },
+    {
+      "path": "/api/cron/crawl",
+      "schedule": "0 18 * * *"
+    }
+  ],
+  "regions": [
+    "hnd1"
   ]
 }
