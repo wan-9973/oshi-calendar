@@ -249,3 +249,40 @@ def cron_crawl(request: Request):
 def cron_retention(request: Request):
     _check_cron(request)
     return retention_run_once()
+
+# Authenticated cache maintenance.
+@app.get("/api/admin/oshi")
+def admin_list_oshi(request: Request):
+    _check_cron(request)
+    with db.session() as s:
+        rows = s.query(db.Oshi).order_by(db.Oshi.id.asc()).all()
+        return {
+            "oshi": [
+                {
+                    "id": row.id,
+                    "name": row.name,
+                    "hidden": bool(row.hidden),
+                    "item_count": s.query(db.Item).filter(db.Item.oshi_id == row.id).count(),
+                    "new_item_count": s.query(db.Item).filter(
+                        db.Item.oshi_id == row.id,
+                        db.Item.first_seen_at >= db.utcnow() - dt.timedelta(days=7),
+                    ).count(),
+                }
+                for row in rows
+            ]
+        }
+
+
+@app.post("/api/admin/oshi/{oshi_id}/visibility")
+def admin_set_oshi_visibility(oshi_id: int, request: Request, payload: dict):
+    _check_cron(request)
+    hidden = payload.get("hidden")
+    if not isinstance(hidden, bool):
+        raise HTTPException(400, "hidden must be true or false")
+    with db.session() as s:
+        row = s.get(db.Oshi, oshi_id)
+        if row is None:
+            raise HTTPException(404, "oshi not found")
+        row.hidden = int(hidden)
+        s.commit()
+        return {"id": row.id, "name": row.name, "hidden": bool(row.hidden)}
