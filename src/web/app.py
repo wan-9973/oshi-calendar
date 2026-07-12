@@ -16,6 +16,7 @@ from collections import defaultdict, deque
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
+from sqlalchemy import or_
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -44,6 +45,12 @@ templates.env.globals.update(
 MEDIA_TABS = [("book", "書籍"), ("cd", "CD"), ("dvd", "映像"), ("magazine", "雑誌"),
               ("game", "ゲーム"), ("ebook", "電子"), ("goods", "グッズ"), ("mixed", "その他")]
 MEDIA_LABEL = dict(MEDIA_TABS)
+
+
+def _purchasable():
+    """購入不可（品切れ・販売終了・入手不可等）の商品を表示から除外する条件。NULL=不明は表示。"""
+    return or_(db.Item.availability.is_(None),
+               db.Item.availability.in_(config.PURCHASABLE_AVAILABILITY))
 
 # --- 検索ジョブ（インメモリ） -------------------------------------------------
 _jobs: dict[str, dict] = {}
@@ -118,6 +125,8 @@ def _card(item: db.Item, price_row: db.PriceCache | None) -> dict:
         "url": item.item_url,   # 楽天ドメインのみ（R6）
         "image": item.image_url,
         "fetched_at": item.meta_fetched_at.strftime("%Y-%m-%d %H:%M") + " UTC",
+        "is_upcoming": bool(item.sales_date_iso) and
+                       item.sales_date_iso >= dt.date.today().isoformat(),
         "is_new": (item.sales_date_precision == "day" and
                    (dt.date.today() - dt.timedelta(days=7)).isoformat()
                    <= item.sales_date_iso <= dt.date.today().isoformat()),
@@ -141,12 +150,12 @@ def top(request: Request):
             .filter(db.Item.sales_date_precision == "day",
                     db.Item.sales_date_iso >= week_ago,
                     db.Item.sales_date_iso <= today,
-                    db.Oshi.hidden == 0) \
+                    db.Oshi.hidden == 0, _purchasable()) \
             .order_by(db.Item.sales_date_iso.desc()).limit(30).all()
         horizon = (dt.date.today() + dt.timedelta(days=60)).isoformat()
         up_rows = s.query(db.Item).join(db.Oshi, db.Oshi.id == db.Item.oshi_id) \
             .filter(db.Item.sales_date_iso >= today, db.Item.sales_date_iso <= horizon,
-                    db.Oshi.hidden == 0) \
+                    db.Oshi.hidden == 0, _purchasable()) \
             .order_by(db.Item.sales_date_iso.asc()).limit(60).all()
         return templates.TemplateResponse(request, "index.html", {
             "new_items": _cards_for(s, new_rows),
@@ -164,7 +173,7 @@ def oshi_page(request: Request, oshi_id: int, y: int | None = None, m: int | Non
             raise HTTPException(404)
         oshi.last_viewed_at = db.utcnow()
         s.commit()
-        rows = s.query(db.Item).filter(db.Item.oshi_id == oshi_id) \
+        rows = s.query(db.Item).filter(db.Item.oshi_id == oshi_id, _purchasable()) \
                 .order_by(db.Item.sales_date_iso.desc()).all()
         cards = _cards_for(s, rows)
         cal = month_calendar(cards, y, m)
@@ -245,7 +254,7 @@ def api_oshi_summary(oshi_id: int):
         oshi = s.get(db.Oshi, oshi_id)
         if oshi is None or oshi.hidden:
             raise HTTPException(404)
-        rows = s.query(db.Item).filter(db.Item.oshi_id == oshi_id) \
+        rows = s.query(db.Item).filter(db.Item.oshi_id == oshi_id, _purchasable()) \
                 .order_by(db.Item.sales_date_iso.desc()).limit(200).all()
         cards = _cards_for(s, rows)
         return JSONResponse({
