@@ -141,7 +141,7 @@ def search_all(name: str, aliases: list[str] | None = None,
             rec = _normalize(api, media, raw, trusted)
             if rec:
                 records.append(rec)
-    merged = merge(records, name, aliases)
+    merged = merge(records, name, aliases, anchors or [])
     if progress:
         progress("完了", total, total)
     return {"records": merged, "failed_apis": failed}
