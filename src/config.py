@@ -49,10 +49,16 @@ SCORE_CAPTION_MATCH = 0.4
 SCORE_THRESHOLD = 0.4     # 未満は非表示
 
 # R9: 成人向け排除。
-# ジャンルIDはライブ環境で BooksGenre/Search・市場ジャンルAPIにより確定させること（確認事項リスト参照）。
-EXCLUDED_BOOKS_GENRE_PREFIXES: list[str] = []   # 例: ["001017"] ← 要ライブ確認
-EXCLUDED_ICHIBA_GENRE_IDS: set[str] = set()     # 要ライブ確認
-NG_WORDS = ["アダルト", "成人向け", "18禁", "R18", "R-18", "官能"]
+# 2026-07-12 ライブ確認結果（公開ジャンル一覧ページで確認）:
+# - 楽天市場の公開ジャンルツリー（第1・第2階層）に「アダルト」ジャンルは存在しない。
+#   成人向け商品は通常ジャンル配下（例: 医薬品>避妊具 等）に分散するため、ID一括除外は不可能。
+# - 楽天ブックスの全年齢ジャンル一覧（本/DVD/雑誌/CD/ゲーム/電子書籍）にも成人向けジャンルなし。
+#   R18商品は年齢認証付き別ストア（books.rakuten.co.jp/adult/）に分離されている。
+# → NGワードを主防御とする。ジャンルIDリストはジャンル再編に備えた予約枠として維持。
+#   （最終確認としてBooksGenre/Search APIをappIdで一度実行することを推奨）
+EXCLUDED_BOOKS_GENRE_PREFIXES: list[str] = []
+EXCLUDED_ICHIBA_GENRE_IDS: set[str] = set()
+NG_WORDS = ["アダルト", "成人向け", "成年向け", "成年コミック", "18禁", "R18", "R-18", "官能"]
 
 # 検索スパム対策（自前サーバー側。楽天API保護のため）
 NEW_SEARCH_PER_IP_PER_MIN = 3
