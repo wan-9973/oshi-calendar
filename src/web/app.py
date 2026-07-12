@@ -73,6 +73,8 @@ def _run_search_job(job_id: str, name: str) -> None:
         anchors = profile["anchors"] if profile else []
         result = search_all(canonical, aliases, anchors, progress=progress)
         oshi_id, _ = find_or_create_oshi(canonical, aliases)
+        if profile:
+            _activate_profiled_oshi(oshi_id)
         save_results(oshi_id, result["records"])
         with _jobs_lock:
             _jobs[job_id].update(status="done", oshi_id=oshi_id,
@@ -80,6 +82,20 @@ def _run_search_job(job_id: str, name: str) -> None:
     except Exception as exc:  # noqa: BLE001 - ジョブは落とさず失敗を記録
         with _jobs_lock:
             _jobs[job_id].update(status="error", message=str(exc))
+
+
+def _activate_profiled_oshi(oshi_id: int) -> None:
+    """Replace stale cache before making a shared ambiguous-name profile public."""
+    with db.session() as s:
+        row = s.get(db.Oshi, oshi_id)
+        if row is None:
+            return
+        s.query(db.Item).filter(db.Item.oshi_id == oshi_id).delete()
+        row.hidden = 0
+        queue = s.get(db.CrawlQueue, oshi_id)
+        if queue is not None:
+            queue.next_crawl_at = db.utcnow()
+        s.commit()
 
 
 # --- 表示用ヘルパ -------------------------------------------------------------
