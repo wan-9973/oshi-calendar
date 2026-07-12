@@ -199,6 +199,9 @@ def api_search(request: Request, payload: dict):
             row.last_searched_at = db.utcnow()
             s.commit()
             return {"status": "cached", "oshi_id": row.id}
+        if row and row.hidden and profile_for(name) is None:
+            # 品質問題で非表示中（検索プロファイル未整備）。APIを浪費せず404を返す。
+            raise HTTPException(404, "この推しページは現在調整中です。時間をおいてお試しください。")
     ip = request.client.host if request.client else "unknown"
     if _rate_limited(ip):
         raise HTTPException(429, "検索が混み合っています。1分ほど待ってからお試しください。")
@@ -211,6 +214,8 @@ def api_search(request: Request, payload: dict):
         if len(result["failed_apis"]) >= 8:
             raise HTTPException(503, "一時的に取得できません")
         oshi_id, _ = find_or_create_oshi(canonical, aliases)
+        if profile:
+            _activate_profiled_oshi(oshi_id)  # 非表示解除+旧キャッシュ破棄（非同期経路と同一の再公開処理）
         save_results(oshi_id, result["records"])
         return {"status": "done", "oshi_id": oshi_id}
     job_id = uuid.uuid4().hex
