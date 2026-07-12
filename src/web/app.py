@@ -1,6 +1,3 @@
-Exit code: 0
-Wall time: 0.6 seconds
-Output:
 """FastAPI Web螻､・按ｧ8・峨・
 
 - 繝ｭ繧ｰ繧､繝ｳ荳崎ｦ√・蜈ｬ髢妓eb繧｢繝励Μ・・8・峨ょ倶ｺｺ蛹悶・繝悶Λ繧ｦ繧ｶlocalStorage縺ｮ縺ｿ縲・
