@@ -19,11 +19,19 @@ def name_variants(name: str, aliases: list[str]) -> list[str]:
     return [normalize(n) for n in [name, *aliases] if n and normalize(n)]
 
 
-def relevance_score(record: dict, name: str, aliases: list[str]) -> float:
+def relevance_score(record: dict, name: str, aliases: list[str], anchors: list[str]) -> float:
     """フィールド一致=1.0 / タイトル一致=0.7 / 説明文のみ=0.4 / 不一致=0.0"""
     variants = name_variants(name, aliases)
     if not variants:
         return 0.0
+    # Broad keyword sources need an additional public entity anchor.
+    if anchors and record.get("source_api") in {"ichiba", "books_total"}:
+        haystack = normalize(" ".join([
+            record.get("title", ""), record.get("author_or_artist", ""),
+            record.get("caption", ""),
+        ]))
+        if not any(normalize(anchor) in haystack for anchor in anchors):
+            return 0.0
     if record.get("trusted_field_match"):
         return config.SCORE_FIELD_MATCH
     title = normalize(record.get("title", ""))
@@ -71,13 +79,14 @@ def dedupe_key(record: dict) -> str:
     return f"title:{normalize(record.get('title', ''))}|{record.get('media','')}"
 
 
-def merge(records: list[dict], name: str, aliases: list[str]) -> list[dict]:
+def merge(records: list[dict], name: str, aliases: list[str], anchors: list[str] | None = None) -> list[dict]:
     """スコア付与 → 閾値未満とR9対象を除去 → JAN/ISBN/itemCodeで名寄せ。"""
+    anchors = anchors or []
     best: dict[str, dict] = {}
     for r in records:
         if is_excluded(r):
             continue
-        score = relevance_score(r, name, aliases)
+        score = relevance_score(r, name, aliases, anchors)
         if score < config.SCORE_THRESHOLD:
             continue
         r = {**r, "relevance": score}
