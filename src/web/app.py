@@ -118,7 +118,9 @@ def _card(item: db.Item, price_row: db.PriceCache | None) -> dict:
         "url": item.item_url,   # 楽天ドメインのみ（R6）
         "image": item.image_url,
         "fetched_at": item.meta_fetched_at.strftime("%Y-%m-%d %H:%M") + " UTC",
-        "is_new": (db.utcnow() - item.first_seen_at) <= dt.timedelta(days=7),
+        "is_new": (item.sales_date_precision == "day" and
+                   (dt.date.today() - dt.timedelta(days=7)).isoformat()
+                   <= item.sales_date_iso <= dt.date.today().isoformat()),
     }
 
 
@@ -133,11 +135,14 @@ def _cards_for(s, items: list[db.Item]) -> list[dict]:
 @app.get("/", response_class=HTMLResponse)
 def top(request: Request):
     with db.session() as s:
-        week_ago = db.utcnow() - dt.timedelta(days=7)
-        new_rows = s.query(db.Item).join(db.Oshi, db.Oshi.id == db.Item.oshi_id) \
-            .filter(db.Item.first_seen_at >= week_ago, db.Oshi.hidden == 0) \
-            .order_by(db.Item.first_seen_at.desc()).limit(30).all()
+        week_ago = (dt.date.today() - dt.timedelta(days=7)).isoformat()
         today = dt.date.today().isoformat()
+        new_rows = s.query(db.Item).join(db.Oshi, db.Oshi.id == db.Item.oshi_id) \
+            .filter(db.Item.sales_date_precision == "day",
+                    db.Item.sales_date_iso >= week_ago,
+                    db.Item.sales_date_iso <= today,
+                    db.Oshi.hidden == 0) \
+            .order_by(db.Item.sales_date_iso.desc()).limit(30).all()
         horizon = (dt.date.today() + dt.timedelta(days=60)).isoformat()
         up_rows = s.query(db.Item).join(db.Oshi, db.Oshi.id == db.Item.oshi_id) \
             .filter(db.Item.sales_date_iso >= today, db.Item.sales_date_iso <= horizon,
