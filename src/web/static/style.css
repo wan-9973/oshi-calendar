@@ -15,7 +15,11 @@ main { max-width:960px; margin:0 auto; padding:16px; }
 .card a { color:var(--ink); }
 .badge { display:inline-block; font-size:0.7rem; background:#eee; border-radius:4px; padding:2px 6px; }
 .badge.new { background:var(--accent); color:#fff; }
-.author,.date { font-size:0.8rem; color:var(--muted); margin:2px 0; }
+.author { font-size:0.8rem; color:var(--muted); margin:2px 0; }
+.date { font-size:0.85rem; color:var(--ink); margin:3px 0; }
+.date strong { color:var(--accent); font-weight:700; }
+.date.upcoming { background:#fff3f0; border-left:3px solid var(--accent); padding:3px 6px; border-radius:3px; }
+.upcoming-label { display:inline-block; margin-left:6px; font-size:0.7rem; font-weight:700; color:#fff; background:var(--accent); border-radius:4px; padding:1px 5px; vertical-align:1px; }
 .price { font-weight:bold; color:var(--accent); margin:4px 0; }
 .price.unavailable { font-weight:normal; font-size:0.78rem; color:var(--muted); }
 .fetched { font-size:0.7rem; color:var(--muted); margin:4px 0 0; }
