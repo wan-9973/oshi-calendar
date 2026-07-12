@@ -1,6 +1,3 @@
-Exit code: 0
-Wall time: 0.6 seconds
-Output:
 """search_service / crawler / retention 縺ｮ邨仙粋繝・せ繝茨ｼ・PI縺ｯ繝｢繝・け・峨・""
 import datetime as dt
 from unittest.mock import MagicMock
