@@ -63,3 +63,11 @@ def test_merge_drops_below_threshold():
 def test_dedupe_key_falls_back_to_title():
     assert dedupe_key(rec(title="同じ タイトル", media="book")) == \
            dedupe_key(rec(title="同じタイトル", media="book"))
+
+def test_ambiguous_broad_search_requires_anchor():
+    record = rec(source_api="ichiba", title="HANA 関連商品")
+    assert relevance_score(record, "HANA", [], ["BMSG"]) == 0.0
+    assert relevance_score(
+        rec(source_api="ichiba", title="HANA BMSG 関連商品"),
+        "HANA", [], ["BMSG"],
+    ) == 0.7
