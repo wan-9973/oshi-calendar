@@ -119,6 +119,7 @@ _MEDIA_LABEL = {"books_book": "書籍", "books_cd": "CD", "books_dvd": "DVD/Blu-
 
 
 def search_all(name: str, aliases: list[str] | None = None,
+               anchors: list[str] | None = None,
                client: RakutenClient | None = None,
                progress: ProgressCb = None) -> dict:
     """全API直列検索。返り値: {'records': [...], 'failed_apis': [...]}"""
