@@ -19,22 +19,32 @@ def name_variants(name: str, aliases: list[str]) -> list[str]:
     return [normalize(n) for n in [name, *aliases] if n and normalize(n)]
 
 
+def _author_parts(author_raw: str) -> list[str]:
+    """複数名義（スラッシュ・カンマ区切り）を正規化して分割。"""
+    return [normalize(p) for p in re.split(r"[/,、，&＆]", author_raw or "") if normalize(p)]
+
+
 def relevance_score(record: dict, name: str, aliases: list[str], anchors: list[str] | None = None) -> float:
     """フィールド一致=1.0 / タイトル一致=0.7 / 説明文のみ=0.4 / 不一致=0.0"""
     variants = name_variants(name, aliases)
     if not variants:
         return 0.0
-    # Broad keyword sources need an additional public entity anchor.
+    # 曖昧名プロファイル（anchors指定あり）: 全APIを対象に、
+    # 「アーティスト/著者の完全一致」か「公開アンカー語の出現」のどちらかを必須にする。
+    # （部分一致 hana⊂Hanada や、APIの曖昧なartistName一致による混入を防ぐ。）
     anchors = anchors or []
-    if anchors and record.get("source_api") in {"ichiba", "books_total"}:
+    author_raw = record.get("author_or_artist", "") or ""
+    exact_author = any(v in _author_parts(author_raw) for v in variants)
+    if anchors and not exact_author:
         haystack = normalize(" ".join([
-            record.get("title", ""), record.get("author_or_artist", ""),
-            record.get("caption", ""),
+            record.get("title", ""), author_raw, record.get("caption", ""),
         ]))
         if not any(normalize(anchor) in haystack for anchor in anchors):
             return 0.0
     if record.get("trusted_field_match"):
-        return config.SCORE_FIELD_MATCH
+        # 曖昧名ではAPI側の曖昧一致を信用せず、完全一致のみを最高スコアにする
+        if not anchors or exact_author:
+            return config.SCORE_FIELD_MATCH
     title = normalize(record.get("title", ""))
     author = normalize(record.get("author_or_artist", ""))
     caption = normalize(record.get("caption", ""))

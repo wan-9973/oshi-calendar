@@ -9,6 +9,7 @@ import datetime as dt
 import logging
 
 from . import config, db
+from .entity_profiles import profile_for
 from .rakuten_client import RakutenClient
 from .search_service import requests_per_oshi, save_results, search_all
 
@@ -70,7 +71,10 @@ def run_once(budget: int | None = None, client: RakutenClient | None = None) -> 
             if used + cost > budget:
                 logger.info("本日の予算上限に到達 used=%d", used)
                 break
-            result = search_all(oshi.name, oshi.aliases, client=client)
+            profile = profile_for(oshi.name)  # 曖昧名は巡回でも共有プロファイルで絞り込む
+            aliases = profile["aliases"] if profile else oshi.aliases
+            anchors = profile["anchors"] if profile else []
+            result = search_all(oshi.name, aliases, anchors, client=client)
             used += cost
             crawled += 1
             if len(result["failed_apis"]) >= 8:  # 全滅時のみ失敗扱い（§12）
