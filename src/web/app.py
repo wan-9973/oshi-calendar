@@ -21,6 +21,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .. import config, db
+from ..entity_profiles import profile_for
 from ..calendar_service import month_calendar, upcoming
 from ..crawler import run_once as crawl_run_once
 from ..retention import run_once as retention_run_once
@@ -66,8 +67,12 @@ def _run_search_job(job_id: str, name: str) -> None:
         with _jobs_lock:
             _jobs[job_id].update(message=msg, step=i, total=total)
     try:
-        result = search_all(name, progress=progress)
-        oshi_id, _ = find_or_create_oshi(name)
+        profile = profile_for(name)
+        canonical = profile["canonical_name"] if profile else name
+        aliases = profile["aliases"] if profile else []
+        anchors = profile["anchors"] if profile else []
+        result = search_all(canonical, aliases, anchors, progress=progress)
+        oshi_id, _ = find_or_create_oshi(canonical, aliases)
         save_results(oshi_id, result["records"])
         with _jobs_lock:
             _jobs[job_id].update(status="done", oshi_id=oshi_id,
@@ -177,10 +182,14 @@ def api_search(request: Request, payload: dict):
     if _rate_limited(ip):
         raise HTTPException(429, "検索が混み合っています。1分ほど待ってからお試しください。")
     if SERVERLESS:  # 同期実行（8リクエスト×1.2秒≒10秒。maxDuration内）
-        result = search_all(name)
+        profile = profile_for(name)
+        canonical = profile["canonical_name"] if profile else name
+        aliases = profile["aliases"] if profile else []
+        anchors = profile["anchors"] if profile else []
+        result = search_all(canonical, aliases, anchors)
         if len(result["failed_apis"]) >= 8:
             raise HTTPException(503, "一時的に取得できません")
-        oshi_id, _ = find_or_create_oshi(name)
+        oshi_id, _ = find_or_create_oshi(canonical, aliases)
         save_results(oshi_id, result["records"])
         return {"status": "done", "oshi_id": oshi_id}
     job_id = uuid.uuid4().hex
