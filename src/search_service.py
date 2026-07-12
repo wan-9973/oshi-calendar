@@ -174,6 +174,7 @@ def save_results(oshi_id: int, merged: list[dict]) -> int:
             row.item_url = rec["item_url"]
             row.image_url = rec["image_url"]
             row.relevance = rec["relevance"]
+            row.availability = rec.get("availability")
             row.meta_fetched_at = now
             if rec.get("price") is not None:
                 s.merge(db.PriceCache(item_code=code, price=rec["price"],

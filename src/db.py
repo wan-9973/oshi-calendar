@@ -5,7 +5,7 @@ import datetime as dt
 import json
 
 from sqlalchemy import (Column, DateTime, Float, ForeignKey, Integer, String,
-                        Text, create_engine, event)
+                        Text, create_engine, event, inspect, text)
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 from . import config
@@ -50,6 +50,7 @@ class Item(Base):
     image_url = Column(Text, default="")
     relevance = Column(Float, default=0.0)
     media = Column(String, default="")             # book/cd/dvd/magazine/game/ebook/goods
+    availability = Column(Integer)                 # 在庫状況（NULL=不明。config.PURCHASABLE_AVAILABILITY参照）
     meta_fetched_at = Column(DateTime, default=utcnow)  # R3: 90日
     first_seen_at = Column(DateTime, default=utcnow)    # 新着判定
 
@@ -104,6 +105,7 @@ def get_engine(url: str | None = None):
         else:
             _engine = create_engine(u, pool_pre_ping=True, pool_size=2, max_overflow=3)
         Base.metadata.create_all(_engine)
+        _migrate(_engine)
         _Session = sessionmaker(bind=_engine, expire_on_commit=False)
     return _engine
 
@@ -111,3 +113,11 @@ def get_engine(url: str | None = None):
 def session():
     get_engine()
     return _Session()
+
+
+def _migrate(engine) -> None:
+    """既存DBへの軽量マイグレーション（create_allは既存テーブルに列を追加しないため）。"""
+    cols = {c["name"] for c in inspect(engine).get_columns("items")}
+    if "availability" not in cols:
+        with engine.begin() as con:
+            con.execute(text("ALTER TABLE items ADD COLUMN availability INTEGER"))

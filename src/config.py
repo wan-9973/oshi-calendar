@@ -60,6 +60,12 @@ EXCLUDED_BOOKS_GENRE_PREFIXES: list[str] = []
 EXCLUDED_ICHIBA_GENRE_IDS: set[str] = set()
 NG_WORDS = ["アダルト", "成人向け", "成年向け", "成年コミック", "18禁", "R18", "R-18", "官能"]
 
+# 購入可能とみなす在庫状況コード（楽天ブックス系API公式ドキュメントの出力値1〜6）。
+# 1:在庫あり 2:通常3〜7日 3:通常3〜9日 4:メーカー取り寄せ 5:予約受付中 6:メーカーに在庫確認
+# これ以外のコード（品切れ・販売終了・入手不可等）は表示から除外する。
+# 在庫情報が無い媒体（Kobo等、NULL）は安全側で表示する。
+PURCHASABLE_AVAILABILITY = {1, 2, 3, 4, 5, 6}
+
 # 検索スパム対策（自前サーバー側。楽天API保護のため）
 NEW_SEARCH_PER_IP_PER_MIN = 3
 
