@@ -71,3 +71,32 @@ def test_ambiguous_broad_search_requires_anchor():
         rec(source_api="ichiba", title="HANA BMSG 関連商品"),
         "HANA", [], ["BMSG"],
     ) == 0.7
+
+
+def test_ambiguous_anchor_applies_to_all_sources():
+    # 部分一致（hana ⊂ Hanada / Cocohana）はアンカーなしでは除外される
+    assert relevance_score(rec(source_api="books_magazine",
+                               title="月刊Hanada 2026年9月号"),
+                           "HANA", [], ["BMSG", "ちゃんみな"]) == 0.0
+    # APIの曖昧なartistName一致（trusted）でも、完全一致でなくアンカーもなければ除外
+    assert relevance_score(rec(source_api="books_cd", trusted_field_match=True,
+                               title="TVアニメ サウンドトラック",
+                               author_or_artist="高梨康治/柊優花"),
+                           "HANA", [], ["BMSG", "ちゃんみな"]) == 0.0
+
+
+def test_ambiguous_exact_author_passes_without_anchor():
+    # アーティスト名の完全一致（複数名義の分割含む）はアンカー不要で最高スコア
+    assert relevance_score(rec(source_api="books_cd", trusted_field_match=True,
+                               title="ROSE", author_or_artist="HANA"),
+                           "HANA", [], ["BMSG"]) == 1.0
+    assert relevance_score(rec(source_api="books_cd", trusted_field_match=True,
+                               title="コラボ曲", author_or_artist="ちゃんみな/HANA"),
+                           "HANA", [], ["BMSG"]) == 1.0
+
+
+def test_ambiguous_anchor_in_caption_passes():
+    got = relevance_score(rec(source_api="books_magazine", title="音楽誌 9月号",
+                              caption="HANA（BMSG）ロングインタビュー掲載"),
+                          "HANA", [], ["BMSG"])
+    assert got > 0.0
