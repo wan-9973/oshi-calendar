@@ -19,12 +19,13 @@ def name_variants(name: str, aliases: list[str]) -> list[str]:
     return [normalize(n) for n in [name, *aliases] if n and normalize(n)]
 
 
-def relevance_score(record: dict, name: str, aliases: list[str], anchors: list[str]) -> float:
+def relevance_score(record: dict, name: str, aliases: list[str], anchors: list[str] | None = None) -> float:
     """フィールド一致=1.0 / タイトル一致=0.7 / 説明文のみ=0.4 / 不一致=0.0"""
     variants = name_variants(name, aliases)
     if not variants:
         return 0.0
     # Broad keyword sources need an additional public entity anchor.
+    anchors = anchors or []
     if anchors and record.get("source_api") in {"ichiba", "books_total"}:
         haystack = normalize(" ".join([
             record.get("title", ""), record.get("author_or_artist", ""),
