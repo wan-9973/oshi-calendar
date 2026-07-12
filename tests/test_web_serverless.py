@@ -108,3 +108,54 @@ def test_sync_search_hidden_unprofiled_returns_404(monkeypatch, tmp_path):
         r = client.post("/api/search", json={"name": "曖昧太郎"})
     assert r.status_code == 404
     called.assert_not_called()
+
+
+def test_unavailable_items_are_hidden_and_dates_emphasized(monkeypatch, tmp_path):
+    """購入不可（在庫コード1〜6以外）は非表示、在庫不明(NULL)は表示。発売前は強調表示。"""
+    import datetime as dt
+    client, webapp = make_app(monkeypatch, tmp_path)
+    from src import db
+    future = (dt.date.today() + dt.timedelta(days=30)).isoformat()
+    with db.session() as s:
+        o = db.Oshi(name="作家X", aliases_json="[]")
+        s.add(o)
+        s.flush()
+        oid = o.id
+        common = dict(oshi_id=oid, source_api="books_book",
+                      sales_date_precision="day")
+        s.add(db.Item(item_code="a1", title="買える予約商品",
+                      item_url="https://hb.afl.rakuten.co.jp/a",
+                      sales_date="発売前テスト日", sales_date_iso=future,
+                      availability=5, **common))
+        s.add(db.Item(item_code="a2", title="入手不可の本",
+                      item_url="https://hb.afl.rakuten.co.jp/b",
+                      sales_date="2020年01月10日", sales_date_iso="2020-01-10",
+                      availability=11, **common))
+        s.add(db.Item(item_code="a3", title="在庫状態不明の本",
+                      item_url="https://hb.afl.rakuten.co.jp/c",
+                      sales_date="2021年01月10日", sales_date_iso="2021-01-10",
+                      **common))
+        s.commit()
+    r = client.get(f"/oshi/{oid}")
+    assert r.status_code == 200
+    assert "買える予約商品" in r.text
+    assert "在庫状態不明の本" in r.text
+    assert "入手不可の本" not in r.text
+    assert 'class="date upcoming"' in r.text  # 発売前の強調
+    assert "発売前" in r.text
+
+
+def test_save_results_persists_availability(monkeypatch, tmp_path):
+    client, webapp = make_app(monkeypatch, tmp_path)
+    from src import db
+    from src.search_service import find_or_create_oshi, save_results
+    oid, _ = find_or_create_oshi("作家Y")
+    save_results(oid, [{"source_api": "books_book", "media": "book",
+                        "item_code": "b1", "title": "本", "author_or_artist": "作家Y",
+                        "caption": "", "sales_date": "2026年08月10日",
+                        "sales_date_iso": "2026-08-10", "sales_date_precision": "day",
+                        "item_url": "https://hb.afl.rakuten.co.jp/x", "image_url": "",
+                        "price": 1000, "availability": 5, "relevance": 1.0}])
+    with db.session() as s:
+        row = s.query(db.Item).filter(db.Item.item_code == "b1").one()
+        assert row.availability == 5
