@@ -1,0 +1,14 @@
+# GitHub Actionsによる巡回増枠（docs/github-actions-crawl.yml.example を有効化）。
+# 必要なリポジトリSecrets: APP_URL（例: https://oshi-calendar-ten.vercel.app）, CRON_SECRET
+name: crawl
+on:
+  schedule:
+    - cron: "*/10 18-19 * * *"  # UTC 18-19時台（JST 3-4時台）に10分間隔
+  workflow_dispatch: {}
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          curl -sS --fail-with-body -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/cron/crawl"
