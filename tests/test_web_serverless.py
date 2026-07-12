@@ -65,3 +65,46 @@ def test_cron_crawl_uses_budget(monkeypatch, tmp_path):
     assert r.status_code == 200
     from src import config
     assert called["budget"] == config.CRAWL_BUDGET_PER_RUN
+
+
+def test_sync_search_reactivates_hidden_profiled_oshi(monkeypatch, tmp_path):
+    """プロファイル整備済みの名前は、非表示中でも再検索で自動再公開される（HANA 404対策）。"""
+    client, webapp = make_app(monkeypatch, tmp_path)
+    from src import db
+    with db.session() as s:
+        row = db.Oshi(name="HANA", aliases_json="[]", hidden=1)
+        s.add(row)
+        s.flush()
+        oshi_id = row.id
+        s.commit()
+    fake = {"records": [{"source_api": "books_cd", "media": "cd",
+                         "item_code": "4900000000001", "title": "ROSE",
+                         "author_or_artist": "HANA", "caption": "",
+                         "sales_date": "2026年08月10日", "sales_date_iso": "2026-08-10",
+                         "sales_date_precision": "day",
+                         "item_url": "https://hb.afl.rakuten.co.jp/x",
+                         "image_url": "", "price": 1500, "availability": 1,
+                         "relevance": 1.0}],
+            "failed_apis": []}
+    with patch.object(webapp, "search_all", return_value=fake):
+        r = client.post("/api/search", json={"name": "HANA"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["status"] == "done" and body["oshi_id"] == oshi_id
+    # 非表示が解除され、ページが200で開ける
+    assert client.get(f"/oshi/{oshi_id}").status_code == 200
+
+
+def test_sync_search_hidden_unprofiled_returns_404(monkeypatch, tmp_path):
+    """プロファイル未整備の非表示推しは、再クロールせず404を返す（API浪費・誤リダイレクト防止）。"""
+    client, webapp = make_app(monkeypatch, tmp_path)
+    from src import db
+    with db.session() as s:
+        row = db.Oshi(name="曖昧太郎", aliases_json="[]", hidden=1)
+        s.add(row)
+        s.commit()
+    called = MagicMock()
+    with patch.object(webapp, "search_all", side_effect=called):
+        r = client.post("/api/search", json={"name": "曖昧太郎"})
+    assert r.status_code == 404
+    called.assert_not_called()
