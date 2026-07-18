@@ -25,6 +25,7 @@ from .. import config, db
 from ..entity_profiles import profile_for
 from ..calendar_service import month_calendar, upcoming
 from ..crawler import run_once as crawl_run_once
+from ..monitoring import health_snapshot, run_job
 from ..retention import run_once as retention_run_once
 from ..search_service import find_or_create_oshi, save_results, search_all
 
@@ -286,13 +287,29 @@ def _check_cron(request: Request) -> None:
 def cron_crawl(request: Request):
     """巡回を小分け実行。1回あたりの予算はCRAWL_BUDGET_PER_RUN（既定40リクエスト≒48秒）。"""
     _check_cron(request)
-    return crawl_run_once(budget=config.CRAWL_BUDGET_PER_RUN if SERVERLESS else None)
+    return run_job(
+        "crawl",
+        lambda: crawl_run_once(
+            budget=config.CRAWL_BUDGET_PER_RUN if SERVERLESS else None
+        ),
+        request.headers.get("x-vercel-id", ""),
+    )
 
 
 @app.get("/api/cron/retention")
 def cron_retention(request: Request):
     _check_cron(request)
-    return retention_run_once()
+    return run_job(
+        "retention",
+        retention_run_once,
+        request.headers.get("x-vercel-id", ""),
+    )
+
+
+@app.get("/api/health")
+def api_health():
+    """日次監視用。商品カードの取得日時ではなくジョブとキューを判定する。"""
+    return health_snapshot()
 
 # Authenticated cache maintenance.
 @app.get("/api/admin/oshi")

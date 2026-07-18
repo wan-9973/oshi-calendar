@@ -34,6 +34,10 @@ uvicorn src.web.app:app --host 0.0.0.0 --port 8000
 ## 運用ジョブ（crontab.example 参照）
 
 - `python -m src.crawler` … 日次巡回。全推しを最大7日周期で更新（R4）。直近60日に発売予定がある推しは3日周期。
+
+Vercel運用では `GET /api/health` が、直近のcrawl/retention成功時刻、実行結果、
+期限を過ぎた巡回キュー件数を返します。商品カードは推し単位のローテーションで更新されるため、
+カード上の取得日時ではなくこのAPIを日次監視の一次判定に使用してください。
 - `python -m src.retention` … 価格キャッシュ24時間失効（R2）、メタデータ90日再取得（R3）、90日未使用推しの削除。
 
 ## 規約適合の実装ポイント

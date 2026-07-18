@@ -78,6 +78,18 @@ class CrawlQueue(Base):
     fail_count = Column(Integer, default=0)
 
 
+class JobRun(Base):
+    """Cronの成否を商品カードの更新日時と独立して追跡する実行履歴。"""
+    __tablename__ = "job_runs"
+    id = Column(Integer, primary_key=True)
+    job_name = Column(String, nullable=False, index=True)
+    started_at = Column(DateTime, default=utcnow, nullable=False, index=True)
+    finished_at = Column(DateTime)
+    status = Column(String, nullable=False, default="running", index=True)
+    result_json = Column(Text, default="{}")
+    error = Column(Text, default="")
+
+
 _engine = None
 _Session = None
 
