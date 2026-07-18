@@ -65,6 +65,75 @@ def test_cron_crawl_uses_budget(monkeypatch, tmp_path):
     assert r.status_code == 200
     from src import config
     assert called["budget"] == config.CRAWL_BUDGET_PER_RUN
+    assert r.json()["job_run_id"] > 0
+    assert r.json()["started_at"].endswith("Z")
+    from src import db
+    with db.session() as s:
+        run = s.get(db.JobRun, r.json()["job_run_id"])
+        assert run.job_name == "crawl"
+        assert run.status == "success"
+
+
+def test_health_uses_job_history_not_item_timestamps(monkeypatch, tmp_path):
+    client, webapp = make_app(monkeypatch, tmp_path)
+    before = client.get("/api/health")
+    assert before.status_code == 200
+    assert before.json()["status"] == "initializing"
+
+    with patch.object(webapp, "crawl_run_once",
+                      return_value={"crawled": 0, "requests_used": 0, "new_items": 0}):
+        assert client.get("/api/cron/crawl",
+                          headers={"Authorization": "Bearer s3cret"}).status_code == 200
+    with patch.object(webapp, "retention_run_once",
+                      return_value={"price_deleted": 0, "meta_requeued": 0,
+                                    "oshi_deleted": 0, "job_runs_deleted": 0}):
+        assert client.get("/api/cron/retention",
+                          headers={"Authorization": "Bearer s3cret"}).status_code == 200
+
+    after = client.get("/api/health").json()
+    assert after["status"] == "healthy"
+    assert after["jobs"]["crawl"]["last_result"]["crawled"] == 0
+    assert after["crawl_queue"]["status"] == "healthy"
+
+
+def test_failed_cron_is_recorded(monkeypatch, tmp_path):
+    client, webapp = make_app(monkeypatch, tmp_path)
+    from fastapi.testclient import TestClient
+    failing_client = TestClient(webapp.app, raise_server_exceptions=False)
+    with patch.object(webapp, "crawl_run_once", side_effect=RuntimeError("API timeout")):
+        r = failing_client.get("/api/cron/crawl",
+                               headers={"Authorization": "Bearer s3cret"})
+    assert r.status_code == 500
+    from src import db
+    with db.session() as s:
+        run = s.query(db.JobRun).order_by(db.JobRun.id.desc()).first()
+        assert run.status == "error"
+        assert "API timeout" in run.error
+
+
+def test_health_detects_stuck_running_job(monkeypatch, tmp_path):
+    client, _ = make_app(monkeypatch, tmp_path)
+    import datetime as dt
+    from src import db
+    now = db.utcnow()
+    with db.session() as s:
+        for name in ("crawl", "retention"):
+            s.add(db.JobRun(
+                job_name=name,
+                started_at=now - dt.timedelta(hours=1),
+                finished_at=now - dt.timedelta(minutes=59),
+                status="success",
+                result_json="{}",
+            ))
+        s.add(db.JobRun(
+            job_name="crawl",
+            started_at=now - dt.timedelta(minutes=11),
+            status="running",
+        ))
+        s.commit()
+    health = client.get("/api/health").json()
+    assert health["status"] == "degraded"
+    assert health["jobs"]["crawl"]["last_run_status"] == "running"
 
 
 def test_sync_search_reactivates_hidden_profiled_oshi(monkeypatch, tmp_path):

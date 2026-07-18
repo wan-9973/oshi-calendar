@@ -58,6 +58,12 @@
    → 結果に違和感があれば共有してください。閾値(0.4)や除外ジャンルを調整します
 3. cron動作確認（手動実行）:
    `curl -H "Authorization: Bearer （CRON_SECRET）" https://（実URL）/api/cron/crawl`
+4. ヘルス確認:
+   `curl https://（実URL）/api/health`
+   - `status=healthy`: crawl/retentionの成功が26時間以内で、26時間超過の巡回キューなし
+   - `status=initializing`: デプロイ後、両ジョブの初回実行履歴がまだない
+   - `status=degraded`: 最終成功から26時間超過、直近実行失敗、10分超のrunning、またはキュー遅延
+   - 商品カードの取得日時は推しごとの巡回周期で変わるため、Cron成否の一次判定には使わない
 
 ## サーバーレス構成での動作の違い（重要）
 

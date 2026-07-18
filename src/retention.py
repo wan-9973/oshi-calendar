@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 def run_once(now: dt.datetime | None = None) -> dict:
     now = now or db.utcnow()
-    price_deleted = meta_requeued = oshi_deleted = 0
+    price_deleted = meta_requeued = oshi_deleted = job_runs_deleted = 0
 
     with db.session() as s:
         # R2: 24時間超の価格キャッシュをDELETE
@@ -48,10 +48,15 @@ def run_once(now: dt.datetime | None = None) -> dict:
                 s.delete(q)
             s.delete(o)
             oshi_deleted += 1
+
+        # Hobbyプランのログ保持期間を補う履歴も、DBを圧迫しないよう期限を設ける。
+        job_run_cutoff = now - dt.timedelta(days=config.JOB_RUN_TTL_DAYS)
+        job_runs_deleted = s.query(db.JobRun) \
+            .filter(db.JobRun.started_at < job_run_cutoff).delete()
         s.commit()
 
     stats = {"price_deleted": price_deleted, "meta_requeued": meta_requeued,
-             "oshi_deleted": oshi_deleted}
+             "oshi_deleted": oshi_deleted, "job_runs_deleted": job_runs_deleted}
     logger.info("retention done: %s", stats)
     return stats
 

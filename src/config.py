@@ -19,6 +19,13 @@ SITE_URL = os.environ.get("SITE_URL", "")
 CRON_SECRET = os.environ.get("CRON_SECRET", "")
 # サーバーレス1回の巡回で使うリクエスト数（maxDuration内に収める）
 CRAWL_BUDGET_PER_RUN = int(os.environ.get("CRAWL_BUDGET_PER_RUN", "40"))
+# 日次ジョブがこの時間を超えて成功していなければヘルスチェックを degraded にする。
+# 24時間周期にGitHub Actions/Vercel Cronの実行遅延を少しだけ許容する。
+CRON_HEALTH_MAX_AGE_HOURS = int(os.environ.get("CRON_HEALTH_MAX_AGE_HOURS", "26"))
+# 関数タイムアウトなどでrunningのまま残った実行を検知する猶予。
+CRON_JOB_STUCK_MINUTES = int(os.environ.get("CRON_JOB_STUCK_MINUTES", "10"))
+# Hobbyプランの短いVercelログ保持期間を補うDB内ジョブ履歴の保持日数。
+JOB_RUN_TTL_DAYS = int(os.environ.get("JOB_RUN_TTL_DAYS", "90"))
 
 RAKUTEN_APP_ID = os.environ.get("RAKUTEN_APP_ID", "")
 RAKUTEN_ACCESS_KEY = os.environ.get("RAKUTEN_ACCESS_KEY", "")  # 2026年より全API必須
