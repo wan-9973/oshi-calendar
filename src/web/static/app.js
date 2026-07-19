@@ -778,7 +778,15 @@
       var list = loadList();
       if (!list.length) return;
       var shareUrl = location.origin + "/my#import=" + encodeURIComponent(list.map(function (oshi) { return oshi.id; }).join(","));
-      copyText(shareUrl).then(function () { showToast("エクスポートURLをコピーしました"); });
+      var output = document.getElementById("export-url-output");
+      output.value = shareUrl;
+      document.getElementById("export-url-label").hidden = false;
+      copyText(shareUrl).then(function () { showToast("エクスポートURLをコピーしました"); })
+        .catch(function () {
+          output.focus();
+          output.select();
+          showToast("表示されたURLをコピーしてください");
+        });
     });
     document.getElementById("import-list").addEventListener("click", function () {
       var value = window.prompt("エクスポートURLを貼り付けてください");
@@ -803,7 +811,7 @@
   /* --- 共通: ページ遷移、トップへ戻る --- */
   document.addEventListener("click", function (event) {
     var link = event.target.closest("a");
-    if (!link || link.target === "_blank" || event.defaultPrevented ||
+    if (!link || link.target === "_blank" || link.hasAttribute("download") || event.defaultPrevented ||
         event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     try {
       var target = new URL(link.href, location.href);

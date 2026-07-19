@@ -304,7 +304,7 @@ def test_oshi_page_loads_only_24_newest_items_then_paginates(monkeypatch, tmp_pa
         oshi = db.Oshi(name="大量商品推し", aliases_json="[]")
         s.add(oshi)
         s.flush()
-        for index in range(55):
+        for index in range(161):
             s.add(db.Item(
                 oshi_id=oshi.id,
                 source_api="books_book",
@@ -316,7 +316,7 @@ def test_oshi_page_loads_only_24_newest_items_then_paginates(monkeypatch, tmp_pa
                 sales_date_iso="",
                 sales_date_precision="",
                 item_url=f"https://hb.afl.rakuten.co.jp/bulk-{index}",
-                image_url="https://example.invalid/image.jpg" if index == 54 else "",
+                image_url="https://example.invalid/image.jpg" if index == 160 else "",
                 availability=5,
             ))
         s.commit()
@@ -334,13 +334,13 @@ def test_oshi_page_loads_only_24_newest_items_then_paginates(monkeypatch, tmp_pa
     body = batch.json()
     assert len(body["items"]) == 24
     assert body["next_offset"] == 48
-    assert body["total"] == 55
+    assert body["total"] == 161
     assert body["has_more"] is True
     assert all(item["url"].startswith("https://hb.afl.rakuten.co.jp/") for item in body["items"])
     assert all(item["fetched_at"].endswith(" UTC") for item in body["items"])
 
-    last = client.get(f"/api/oshi/{oshi_id}/items?offset=48&limit=24").json()
-    assert len(last["items"]) == 7
+    last = client.get(f"/api/oshi/{oshi_id}/items?offset=144&limit=24").json()
+    assert len(last["items"]) == 17
     assert last["has_more"] is False
 
 
@@ -461,11 +461,13 @@ def test_personalization_hooks_keep_local_storage_private(monkeypatch, tmp_path)
     assert 'id="personalized-section"' in top
     assert 'id="my-calendar"' in my_page
     assert 'id="export-list"' in my_page and 'id="import-list"' in my_page
+    assert 'id="export-url-output"' in my_page
     assert "このリストはお使いのブラウザにのみ保存されています。サーバーには送信されません。" in my_page
     assert "URLフラグメント" in my_page
     assert '"#import="' in script
     assert '"?import="' not in script  # インポート対象はHTTPリクエストへ載せない
     assert "text/calendar;charset=utf-8" in script
+    assert 'link.hasAttribute("download")' in script
     assert "navigator.clipboard" in script
 
 

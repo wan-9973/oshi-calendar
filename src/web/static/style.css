@@ -531,6 +531,16 @@ main {
 }
 .text-button:hover { background: var(--accent-soft); }
 .import-help { padding: 8px 12px; background: var(--surface-soft); border-radius: var(--control-radius); }
+.export-url-label { display: grid; margin-top: 12px; color: var(--muted); font-size: 0.76rem; font-weight: 700; gap: 5px; }
+.export-url-label input {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 10px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--control-radius);
+}
 .my-calendar { margin-top: 0; }
 .my-calendar-toolbar { position: relative; top: auto; }
 .my-list { display: grid; gap: 24px; }
