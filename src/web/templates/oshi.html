@@ -8,11 +8,14 @@
 </section>
 
 <section class="calendar-section">
+  {% if showing_history %}
+  <p class="calendar-notice" role="status">現在発表されている今後の発売予定はありません。直近の発売実績を表示しています。</p>
+  {% endif %}
   <div class="calendar-toolbar">
     <nav class="month-nav" aria-label="表示月の変更">
-      <a class="month-button" href="/oshi/{{ oshi.id }}?y={{ prev.y }}&m={{ prev.m }}" aria-label="前月へ">← <span>前月</span></a>
+      {% if prev %}<a class="month-button" href="/oshi/{{ oshi.id }}?y={{ prev.y }}&m={{ prev.m }}" aria-label="前の供給月へ">← <span>前の供給月</span></a>{% else %}<span class="month-button disabled" aria-disabled="true">← <span>前の供給月</span></span>{% endif %}
       <h2>{{ year }}年{{ month }}月</h2>
-      <a class="month-button" href="/oshi/{{ oshi.id }}?y={{ next.y }}&m={{ next.m }}" aria-label="翌月へ"><span>翌月</span> →</a>
+      {% if next %}<a class="month-button" href="/oshi/{{ oshi.id }}?y={{ next.y }}&m={{ next.m }}" aria-label="次の供給月へ"><span>次の供給月</span> →</a>{% else %}<span class="month-button disabled" aria-disabled="true"><span>次の供給月</span> →</span>{% endif %}
     </nav>
     <div class="filter-scroller" role="group" aria-label="媒体別フィルタ">
       <button class="tab active" type="button" data-tab="all" aria-pressed="true">すべて <span class="count-badge">{{ calendar_total }}</span></button>
@@ -30,7 +33,7 @@
             {{ card(group.representative) }}
             {% if group.variations %}
             <details class="variations">
-              <summary>他{{ group.variations | length }}件のバリエーション</summary>
+              <summary>他{{ group.variations | length }}件のバリエーションを見る</summary>
               <div class="grid variation-grid">{% for c in group.variations %}{{ card(c) }}{% endfor %}</div>
             </details>
             {% endif %}
@@ -55,6 +58,27 @@
 
 <section class="content-section">
   <h2 class="section-title">新着順</h2>
-  <div class="grid">{% for c in newest %}{{ card(c) }}{% endfor %}</div>
+  <div class="grid" id="newest-grid">
+    {% for group in newest_groups %}
+    <div class="variation-group" data-variation-group>
+      {{ card(group.representative) }}
+      {% if group.variations %}
+      <details class="variations">
+        <summary>他{{ group.variations | length }}件のバリエーションを見る</summary>
+        <div class="grid variation-grid">{% for c in group.variations %}{{ card(c) }}{% endfor %}</div>
+      </details>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% if newest_loaded < newest_total %}
+  <div class="load-more-wrap">
+    <button id="load-more-items" class="secondary-button" type="button"
+            data-oshi-id="{{ oshi.id }}" data-offset="{{ newest_loaded }}" data-total="{{ newest_total }}">
+      もっと見る <span class="load-more-count">（残り{{ newest_total - newest_loaded }}件）</span>
+    </button>
+    <p id="load-more-status" class="note" role="status" aria-live="polite"></p>
+  </div>
+  {% endif %}
 </section>
 {% endblock %}

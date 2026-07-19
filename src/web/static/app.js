@@ -35,6 +35,108 @@
     document.body.classList.remove("skeleton-visible");
   }
 
+  function appendTextElement(parent, tag, className, text) {
+    var element = document.createElement(tag);
+    if (className) element.className = className;
+    element.textContent = text;
+    parent.appendChild(element);
+    return element;
+  }
+
+  function createProductCard(card, options) {
+    options = options || {};
+    var shell = document.createElement("article");
+    shell.className = "card-shell";
+    shell.dataset.variationKey = card.variation_key || "";
+    shell.dataset.salesMonth = card.sales_month || "";
+
+    var link = document.createElement("a");
+    link.className = "card";
+    link.dataset.media = card.media_key || "";
+    if (card.oshi_id) link.dataset.oshiId = String(card.oshi_id);
+    link.href = card.url;
+    link.rel = "nofollow sponsored";
+    link.target = "_blank";
+
+    var media = document.createElement("div");
+    media.className = "card-media";
+    if (card.image) {
+      var image = document.createElement("img");
+      image.src = card.image;
+      image.alt = card.title;
+      image.loading = "lazy";
+      image.decoding = "async";
+      image.width = 480;
+      image.height = 480;
+      media.appendChild(image);
+    } else {
+      var placeholder = document.createElement("div");
+      placeholder.className = "image-placeholder";
+      placeholder.setAttribute("role", "img");
+      placeholder.setAttribute("aria-label", card.title + "の画像はありません");
+      var icon = appendTextElement(placeholder, "span", "", "📦");
+      icon.setAttribute("aria-hidden", "true");
+      appendTextElement(placeholder, "small", "", "NO IMAGE");
+      media.appendChild(placeholder);
+    }
+    link.appendChild(media);
+
+    var body = document.createElement("div");
+    body.className = "card-body";
+    var badges = document.createElement("div");
+    badges.className = "badge-row";
+    appendTextElement(badges, "span", "badge", card.media || card.media_key || "その他");
+    if (card.is_new) appendTextElement(badges, "span", "badge new", "NEW");
+    if (options.showOshi && card.oshi_name) {
+      appendTextElement(badges, "span", "badge oshi-chip", card.oshi_name);
+    }
+    if (options.myOshi) appendTextElement(badges, "span", "badge my-oshi-badge", "♥ マイ推し");
+    body.appendChild(badges);
+
+    var title = appendTextElement(body, "h3", "", card.title);
+    title.title = card.title;
+    if (card.author) appendTextElement(body, "p", "author", card.author);
+
+    var details = document.createElement("div");
+    details.className = "card-details";
+    if (card.sales_date) {
+      var date = document.createElement("p");
+      date.className = "date" + (card.is_upcoming ? " upcoming" : "");
+      appendTextElement(date, "span", "detail-label", "発売日");
+      appendTextElement(date, "strong", "", card.sales_date);
+      if (card.is_upcoming) appendTextElement(date, "span", "upcoming-label", "発売前");
+      details.appendChild(date);
+    }
+    if (card.price !== null && card.price !== undefined) {
+      appendTextElement(details, "p", "price", new Intl.NumberFormat("ja-JP").format(card.price) + "円（税込）");
+    } else {
+      appendTextElement(details, "p", "price unavailable", "最新価格は楽天でご確認ください");
+    }
+    appendTextElement(details, "p", "fetched", "[" + card.fetched_at + "] 時点の情報");
+    body.appendChild(details);
+    link.appendChild(body);
+    shell.appendChild(link);
+    return shell;
+  }
+
+  function createVariationGroup(group, options) {
+    var wrapper = document.createElement("div");
+    wrapper.className = "variation-group";
+    wrapper.dataset.variationGroup = "";
+    wrapper.appendChild(createProductCard(group.representative, options));
+    if (group.variations && group.variations.length) {
+      var details = document.createElement("details");
+      details.className = "variations";
+      appendTextElement(details, "summary", "", "他" + group.variations.length + "件のバリエーションを見る");
+      var grid = document.createElement("div");
+      grid.className = "grid variation-grid";
+      group.variations.forEach(function (card) { grid.appendChild(createProductCard(card, options)); });
+      details.appendChild(grid);
+      wrapper.appendChild(details);
+    }
+    return wrapper;
+  }
+
   /* --- トップ: 検索とプログレス表示（§8.4） --- */
   var form = document.getElementById("search-form");
   if (form) {
@@ -177,6 +279,43 @@
       });
     });
   });
+
+  /* --- 推しページ: 新着順を24件ずつ追加描画 --- */
+  var loadMore = document.getElementById("load-more-items");
+  if (loadMore) {
+    loadMore.addEventListener("click", function () {
+      var grid = document.getElementById("newest-grid");
+      var status = document.getElementById("load-more-status");
+      var offset = parseInt(loadMore.dataset.offset, 10) || 0;
+      var total = parseInt(loadMore.dataset.total, 10) || 0;
+      loadMore.disabled = true;
+      loadMore.setAttribute("aria-busy", "true");
+      status.textContent = "商品を読み込んでいます…";
+      fetch("/api/oshi/" + loadMore.dataset.oshiId + "/items?offset=" + offset + "&limit=24")
+        .then(function (response) {
+          if (!response.ok) throw new Error();
+          return response.json();
+        })
+        .then(function (data) {
+          data.groups.forEach(function (group) { grid.appendChild(createVariationGroup(group)); });
+          loadMore.dataset.offset = String(data.next_offset);
+          var remaining = Math.max(0, total - data.next_offset);
+          status.textContent = data.items.length + "件を追加しました。";
+          if (!data.has_more) {
+            loadMore.remove();
+          } else {
+            loadMore.querySelector(".load-more-count").textContent = "（残り" + remaining + "件）";
+            loadMore.disabled = false;
+            loadMore.setAttribute("aria-busy", "false");
+          }
+        })
+        .catch(function () {
+          status.textContent = "読み込めませんでした。もう一度お試しください。";
+          loadMore.disabled = false;
+          loadMore.setAttribute("aria-busy", "false");
+        });
+    });
+  }
 
   /* --- マイページ: localStorageから各推しのサマリを描画 --- */
   var myList = document.getElementById("my-list");
