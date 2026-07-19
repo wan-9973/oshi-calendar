@@ -24,7 +24,7 @@ from fastapi.templating import Jinja2Templates
 
 from .. import config, db
 from ..entity_profiles import profile_for
-from ..calendar_service import month_calendar, upcoming
+from ..calendar_service import month_calendar
 from ..crawler import run_once as crawl_run_once
 from ..monitoring import health_snapshot, run_job
 from ..retention import run_once as retention_run_once
