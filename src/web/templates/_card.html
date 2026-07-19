@@ -1,10 +1,11 @@
-{% macro card(c) -%}
-<a class="card" data-media="{{ c.media_key }}" href="{{ c.url }}" rel="nofollow sponsored" target="_blank">
+{% macro card(c, show_oshi=false) -%}
+<article class="card-shell" data-variation-key="{{ c.variation_key }}" data-sales-month="{{ c.sales_month }}">
+<a class="card" data-media="{{ c.media_key }}"{% if c.oshi_id %} data-oshi-id="{{ c.oshi_id }}"{% endif %} href="{{ c.url }}" rel="nofollow sponsored" target="_blank">
   <div class="card-media">
-    {% if c.image %}<img src="{{ c.image }}" alt="{{ c.title }}" loading="lazy">{% else %}<div class="image-placeholder" role="img" aria-label="{{ c.title }}の画像はありません"><span aria-hidden="true">📦</span><small>NO IMAGE</small></div>{% endif %}
+    {% if c.image %}<img src="{{ c.image }}" alt="{{ c.title }}" loading="lazy" decoding="async" width="480" height="480">{% else %}<div class="image-placeholder" role="img" aria-label="{{ c.title }}の画像はありません"><span aria-hidden="true">📦</span><small>NO IMAGE</small></div>{% endif %}
   </div>
   <div class="card-body">
-    <div class="badge-row"><span class="badge">{{ c.media }}</span>{% if c.is_new %}<span class="badge new">NEW</span>{% endif %}</div>
+    <div class="badge-row"><span class="badge">{{ c.media }}</span>{% if c.is_new %}<span class="badge new">NEW</span>{% endif %}{% if show_oshi and c.oshi_name %}<span class="badge oshi-chip">{{ c.oshi_name }}</span>{% endif %}</div>
     <h3 title="{{ c.title }}">{{ c.title }}</h3>
     {% if c.author %}<p class="author">{{ c.author }}</p>{% endif %}
     <div class="card-details">
@@ -18,4 +19,5 @@
     </div>
   </div>
 </a>
+</article>
 {%- endmacro %}

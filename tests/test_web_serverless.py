@@ -278,14 +278,197 @@ def test_empty_month_links_to_next_release_and_counts_media(monkeypatch, tmp_pat
 def test_variation_grouping_is_conservative(monkeypatch, tmp_path):
     _, webapp = make_app(monkeypatch, tmp_path)
     cards = [
-        {"title": "長い共通タイトルのアルバム【初回限定盤】"},
-        {"title": "長い共通タイトルのアルバム【通常盤】"},
-        {"title": "別の長いタイトルのアルバム"},
+        {"title": "長い共通タイトルのアルバム【初回限定盤】", "sales_date_iso": "2026-08-01"},
+        {"title": "長い共通タイトルのアルバム【通常盤】", "sales_date_iso": "2026-08-15"},
+        {"title": "別の長いタイトルのアルバム", "sales_date_iso": "2026-08-15"},
     ]
     groups = webapp._group_variations(cards)
     assert len(groups) == 2
     assert groups[0]["representative"]["title"].endswith("【初回限定盤】")
     assert [card["title"] for card in groups[0]["variations"]] == [cards[1]["title"]]
+
+    short_exact = [
+        {"title": "パプリカ【初回限定盤】", "sales_date_iso": "2026-09-01"},
+        {"title": "パプリカ【通常盤】", "sales_date_iso": "2026-09-20"},
+        {"title": "パプリカ【通常盤】", "sales_date_iso": "2026-10-01"},
+    ]
+    short_groups = webapp._group_variations(short_exact)
+    assert len(short_groups) == 2  # 同じ発売月だけをまとめる
+    assert len(short_groups[0]["variations"]) == 1
+
+
+def test_oshi_page_loads_only_24_newest_items_then_paginates(monkeypatch, tmp_path):
+    client, _ = make_app(monkeypatch, tmp_path)
+    from src import db
+    with db.session() as s:
+        oshi = db.Oshi(name="大量商品推し", aliases_json="[]")
+        s.add(oshi)
+        s.flush()
+        for index in range(161):
+            s.add(db.Item(
+                oshi_id=oshi.id,
+                source_api="books_book",
+                media="book",
+                item_code=f"bulk-{index:03d}",
+                title=f"大量商品タイトル {index:03d}",
+                author_or_artist="大量商品推し",
+                sales_date="",
+                sales_date_iso="",
+                sales_date_precision="",
+                item_url=f"https://hb.afl.rakuten.co.jp/bulk-{index}",
+                image_url="https://example.invalid/image.jpg" if index == 160 else "",
+                availability=5,
+            ))
+        s.commit()
+        oshi_id = oshi.id
+
+    page = client.get(f"/oshi/{oshi_id}")
+    assert page.status_code == 200
+    assert page.text.count('<a class="card"') == 24
+    assert 'id="load-more-items"' in page.text
+    assert 'data-offset="24"' in page.text
+    assert 'loading="lazy" decoding="async" width="480" height="480"' in page.text
+
+    batch = client.get(f"/api/oshi/{oshi_id}/items?offset=24&limit=24")
+    assert batch.status_code == 200
+    body = batch.json()
+    assert len(body["items"]) == 24
+    assert body["next_offset"] == 48
+    assert body["total"] == 161
+    assert body["has_more"] is True
+    assert all(item["url"].startswith("https://hb.afl.rakuten.co.jp/") for item in body["items"])
+    assert all(item["fetched_at"].endswith(" UTC") for item in body["items"])
+
+    last = client.get(f"/api/oshi/{oshi_id}/items?offset=144&limit=24").json()
+    assert len(last["items"]) == 17
+    assert last["has_more"] is False
+
+
+def test_initial_month_prefers_supply_and_skips_empty_months(monkeypatch, tmp_path):
+    import datetime as dt
+    client, _ = make_app(monkeypatch, tmp_path)
+    from src import db
+    today = dt.date.today()
+    future = (today.replace(day=28) + dt.timedelta(days=40)).replace(day=12)
+    past = (today.replace(day=1) - dt.timedelta(days=70)).replace(day=8)
+    with db.session() as s:
+        oshi = db.Oshi(name="月選択推し", aliases_json="[]")
+        s.add(oshi)
+        s.flush()
+        for code, release in (("future", future), ("past", past)):
+            s.add(db.Item(
+                oshi_id=oshi.id, source_api="books_cd", media="cd", item_code=code,
+                title=f"{code} supply title", author_or_artist="月選択推し",
+                sales_date=f"{release.year}年{release.month:02d}月{release.day:02d}日",
+                sales_date_iso=release.isoformat(), sales_date_precision="day",
+                item_url=f"https://hb.afl.rakuten.co.jp/{code}", availability=5,
+            ))
+        s.commit()
+        oshi_id = oshi.id
+
+    page = client.get(f"/oshi/{oshi_id}").text
+    assert f"<h2>{future.year}年{future.month}月</h2>" in page
+    assert "future supply title" in page
+    assert f"?y={past.year}&m={past.month}" in page
+    assert "前の供給月" in page
+
+    with db.session() as s:
+        past_only = db.Oshi(name="過去のみ推し", aliases_json="[]")
+        s.add(past_only)
+        s.flush()
+        s.add(db.Item(
+            oshi_id=past_only.id, source_api="books_book", media="book", item_code="past-only",
+            title="直近の過去商品", author_or_artist="過去のみ推し",
+            sales_date=f"{past.year}年{past.month:02d}月{past.day:02d}日",
+            sales_date_iso=past.isoformat(), sales_date_precision="day",
+            item_url="https://hb.afl.rakuten.co.jp/past-only", availability=5,
+        ))
+        s.commit()
+        past_only_id = past_only.id
+    history_page = client.get(f"/oshi/{past_only_id}").text
+    assert "現在発表されている今後の発売予定はありません。直近の発売実績を表示しています。" in history_page
+    assert f"<h2>{past.year}年{past.month}月</h2>" in history_page
+
+
+def test_oshi_page_normalizes_known_alias_display_only(monkeypatch, tmp_path):
+    client, _ = make_app(monkeypatch, tmp_path)
+    from src import db
+    with db.session() as s:
+        oshi = db.Oshi(name="米津玄師", aliases_json='["Kenshi Yonezu"]')
+        s.add(oshi)
+        s.flush()
+        s.add(db.Item(
+            oshi_id=oshi.id, source_api="books_cd", media="cd", item_code="alias-item",
+            title="Alias display item", author_or_artist="Kenshi Yonezu",
+            sales_date="", sales_date_iso="", sales_date_precision="",
+            item_url="https://hb.afl.rakuten.co.jp/alias", availability=5,
+        ))
+        s.commit()
+        oshi_id = oshi.id
+    page = client.get(f"/oshi/{oshi_id}").text
+    assert '<p class="author">米津玄師</p>' in page
+    with db.session() as s:
+        assert s.query(db.Item).filter_by(item_code="alias-item").one().author_or_artist == "Kenshi Yonezu"
+
+
+def test_personalization_summary_and_calendar_are_read_only_per_oshi(monkeypatch, tmp_path):
+    import datetime as dt
+    client, _ = make_app(monkeypatch, tmp_path)
+    from src import db
+    today = dt.date.today()
+    future = today + dt.timedelta(days=120)
+    past = today - dt.timedelta(days=45)
+    with db.session() as s:
+        oshi = db.Oshi(name="個人化推し", aliases_json="[]")
+        s.add(oshi)
+        s.flush()
+        for code, release in (("future-personal", future), ("past-personal", past)):
+            s.add(db.Item(
+                oshi_id=oshi.id, source_api="books_book", media="book", item_code=code,
+                title=f"個人化商品 {code}", author_or_artist="個人化推し",
+                sales_date=f"{release.year}年{release.month:02d}月{release.day:02d}日",
+                sales_date_iso=release.isoformat(), sales_date_precision="day",
+                item_url=f"https://hb.afl.rakuten.co.jp/{code}", availability=5,
+            ))
+        s.commit()
+        oshi_id = oshi.id
+
+    summary = client.get(f"/api/oshi/{oshi_id}/summary?limit=8")
+    assert summary.status_code == 200
+    body = summary.json()
+    assert body["id"] == oshi_id and body["name"] == "個人化推し"
+    assert body["upcoming"][0]["sales_date_iso"] == future.isoformat()  # 60日超も取得
+    assert body["latest_supply"]["sales_date_iso"] == past.isoformat()
+    assert f"{future.year:04d}-{future.month:02d}" in body["available_months"]
+    assert all(card["url"].startswith("https://hb.afl.rakuten.co.jp/") for card in body["recent"])
+    assert all(card["fetched_at"].endswith(" UTC") for card in body["recent"])
+
+    calendar = client.get(f"/api/oshi/{oshi_id}/calendar?y={future.year}&m={future.month}&limit=48")
+    assert calendar.status_code == 200
+    calendar_body = calendar.json()
+    assert calendar_body["total"] == 1
+    assert calendar_body["items"][0]["title"] == "個人化商品 future-personal"
+    assert calendar_body["items"][0]["oshi_name"] == "個人化推し"
+    assert client.get(f"/api/oshi/{oshi_id}/calendar?y={future.year}&m=13").status_code == 422
+
+
+def test_personalization_hooks_keep_local_storage_private(monkeypatch, tmp_path):
+    client, _ = make_app(monkeypatch, tmp_path)
+    top = client.get("/").text
+    my_page = client.get("/my").text
+    script = client.get("/static/app.js").text
+
+    assert 'id="personalized-section"' in top
+    assert 'id="my-calendar"' in my_page
+    assert 'id="export-list"' in my_page and 'id="import-list"' in my_page
+    assert 'id="export-url-output"' in my_page
+    assert "このリストはお使いのブラウザにのみ保存されています。サーバーには送信されません。" in my_page
+    assert "URLフラグメント" in my_page
+    assert '"#import="' in script
+    assert '"?import="' not in script  # インポート対象はHTTPリクエストへ載せない
+    assert "text/calendar;charset=utf-8" in script
+    assert 'link.hasAttribute("download")' in script
+    assert "navigator.clipboard" in script
 
 
 def test_save_results_persists_availability(monkeypatch, tmp_path):

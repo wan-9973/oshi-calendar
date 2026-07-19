@@ -213,6 +213,19 @@ main {
   border-radius: 999px;
 }
 .section-title span { color: var(--muted); font-family: "Noto Sans JP", sans-serif; font-size: 0.72em; font-weight: 500; }
+.section-heading-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.section-heading-row .section-title { margin-bottom: 0; }
+.text-link { min-height: 44px; padding: 9px 4px; color: var(--accent-strong); font-weight: 700; }
+.personalized-section {
+  margin-top: 0;
+  padding: 28px;
+  background: linear-gradient(135deg, #FFFFFF 0%, var(--accent-soft) 100%);
+  border: 1px solid #F6DDE3;
+  border-radius: 20px;
+  box-shadow: var(--shadow);
+}
+.personalized-section .note { margin: 10px 0 18px; }
+.personalized-grid, .personalized-skeleton { margin-top: 20px; }
 .grid,
 .timeline-grid {
   display: grid;
@@ -220,6 +233,7 @@ main {
   gap: 24px;
   align-items: stretch;
 }
+.card-shell { display: flex; min-width: 0; height: 100%; flex-direction: column; }
 .card {
   display: flex;
   min-width: 0;
@@ -276,6 +290,8 @@ main {
   line-height: 1;
 }
 .badge.new { color: #FFFFFF; background: var(--accent-hover); }
+.badge.oshi-chip { color: #6A4050; background: #F6DCE3; }
+.badge.my-oshi-badge { color: #FFFFFF; background: #7C4660; }
 .card h3 {
   display: -webkit-box;
   min-height: calc(1.5em * 2);
@@ -333,6 +349,15 @@ main {
 .favorite-button.is-active { color: var(--accent-strong); background: var(--accent-soft); box-shadow: none; }
 .favorite-button.is-active:hover { color: var(--accent-strong); background: #F9DFE5; }
 .calendar-section { margin-top: 0; }
+.calendar-notice {
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  color: var(--muted);
+  background: var(--accent-soft);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--control-radius);
+  font-size: 0.82rem;
+}
 .calendar-toolbar {
   position: sticky;
   top: var(--header-height);
@@ -362,6 +387,7 @@ main {
 }
 .month-button:last-child { justify-self: end; }
 .month-button:hover { color: var(--accent-hover); border-color: #F2C5CF; }
+.month-button.disabled { color: var(--muted-soft); background: #F1EFEC; cursor: not-allowed; opacity: 0.66; }
 .filter-scroller {
   display: flex;
   margin-top: 10px;
@@ -437,6 +463,19 @@ main {
   cursor: pointer;
 }
 .variation-grid { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); margin-top: 12px; gap: 12px; }
+.calendar-add-button {
+  min-height: 44px;
+  margin-top: 8px;
+  padding: 8px 12px;
+  color: var(--accent-strong);
+  background: var(--surface);
+  border: 1px solid #F2C5CF;
+  border-radius: var(--control-radius);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.calendar-add-button:hover { color: var(--accent-hover); background: var(--accent-soft); }
 .empty-state {
   display: flex;
   align-items: center;
@@ -456,9 +495,54 @@ main {
 .calendar-empty strong { color: var(--ink); }
 .next-release-title { max-width: 640px; font-size: 0.84rem; }
 .primary-link { margin-top: 20px; }
+.load-more-wrap { margin-top: 28px; text-align: center; }
+.secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 10px 22px;
+  color: var(--accent-strong);
+  background: var(--surface);
+  border: 1px solid #F2C5CF;
+  border-radius: var(--control-radius);
+  box-shadow: var(--shadow);
+  font-weight: 700;
+  cursor: pointer;
+}
+.secondary-button:hover { color: var(--accent-hover); background: var(--accent-soft); box-shadow: var(--shadow-hover); }
+.secondary-button:disabled { cursor: wait; opacity: 0.68; }
+.load-more-count { color: var(--muted); font-size: 0.82rem; font-weight: 500; }
 
 .page-heading-card { align-items: flex-start; }
 .page-heading-card .note { max-width: 520px; margin: 4px 0 0; }
+.my-privacy { max-width: 560px; }
+.transfer-actions { display: flex; align-items: center; margin-top: 14px; gap: 8px; flex-wrap: wrap; }
+.transfer-actions .secondary-button { min-height: 44px; padding: 8px 14px; }
+.text-button {
+  min-height: 44px;
+  padding: 8px 10px;
+  color: var(--accent-strong);
+  background: transparent;
+  border: 0;
+  border-radius: var(--control-radius);
+  font-weight: 700;
+  cursor: pointer;
+}
+.text-button:hover { background: var(--accent-soft); }
+.import-help { padding: 8px 12px; background: var(--surface-soft); border-radius: var(--control-radius); }
+.export-url-label { display: grid; margin-top: 12px; color: var(--muted); font-size: 0.76rem; font-weight: 700; gap: 5px; }
+.export-url-label input {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 10px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--control-radius);
+}
+.my-calendar { margin-top: 0; }
+.my-calendar-toolbar { position: relative; top: auto; }
 .my-list { display: grid; gap: 24px; }
 .my-oshi-card {
   padding: 24px;
@@ -467,8 +551,30 @@ main {
   border-radius: var(--card-radius);
   box-shadow: var(--shadow);
 }
-.my-oshi-card h2 { margin-bottom: 16px; }
+.my-oshi-card h2 { margin: 0; }
 .my-oshi-card h2 a { display: inline-flex; align-items: center; min-height: 44px; }
+.my-oshi-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; gap: 12px; }
+.oshi-order-actions { display: flex; align-items: center; gap: 6px; }
+.icon-button,
+.remove-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 7px 11px;
+  color: var(--ink);
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.icon-button:hover, .remove-button:hover { color: var(--accent-hover); border-color: #F2C5CF; }
+.icon-button:disabled, .month-button:disabled, .secondary-button:disabled { cursor: not-allowed; opacity: 0.48; }
+.remove-button { color: #8B3448; }
+.supply-summary { margin: 0 0 14px; color: var(--ink); font-weight: 700; }
+.my-summary-grid { display: grid; grid-template-columns: minmax(220px, 320px); }
 .summary { color: var(--ink); }
 .summary h3 { margin: 18px 0 8px; font-size: 1rem; }
 .summary ul { display: grid; margin: 0; padding: 0; list-style: none; gap: 8px; }
@@ -561,6 +667,18 @@ main {
   .search-form input { height: 50px; padding: 0 7px; font-size: 0.82rem; }
   .search-form button { min-width: 68px; min-height: 46px; padding: 8px 13px; }
   .content-section { margin-top: 44px; }
+  .section-heading-row { align-items: flex-start; flex-direction: column; gap: 4px; }
+  .personalized-section { margin-right: -4px; margin-left: -4px; padding: 22px 12px; }
+  .personalized-grid, .personalized-skeleton {
+    display: grid;
+    grid-auto-columns: minmax(158px, 72vw);
+    grid-auto-flow: column;
+    grid-template-columns: none;
+    padding: 4px 2px 12px;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+  }
+  .personalized-grid > *, .personalized-skeleton > * { scroll-snap-align: start; }
   .section-title { margin-bottom: 18px; }
   .grid, .timeline-grid, .skeleton-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .card { border-radius: 13px; }
@@ -596,6 +714,13 @@ main {
   .empty-state { min-height: 190px; padding: 24px 16px; }
   .empty-state h2 { font-size: 1.05rem; }
   .my-oshi-card { padding: 18px; }
+  .my-oshi-header { align-items: flex-start; flex-direction: column; }
+  .oshi-order-actions { width: 100%; }
+  .remove-button { margin-left: auto; }
+  .my-summary-grid { grid-template-columns: minmax(0, 1fr); }
+  .transfer-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .transfer-actions .text-button { grid-column: 1 / -1; }
+  .my-calendar .month-button span { display: inline; }
   .summary li { padding: 10px; }
   .site-footer { padding: 28px 16px; }
   .back-to-top { right: 14px; bottom: 14px; }

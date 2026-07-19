@@ -16,7 +16,7 @@ import uuid
 from collections import defaultdict, deque
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from sqlalchemy import or_
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -24,7 +24,7 @@ from fastapi.templating import Jinja2Templates
 
 from .. import config, db
 from ..entity_profiles import profile_for
-from ..calendar_service import month_calendar, upcoming
+from ..calendar_service import month_calendar
 from ..crawler import run_once as crawl_run_once
 from ..monitoring import health_snapshot, run_job
 from ..retention import run_once as retention_run_once
@@ -51,6 +51,7 @@ WEEKDAY_LABELS = ("月", "火", "水", "木", "金", "土", "日")
 
 _VARIATION_MARKERS = (
     "限定", "特典", "初回", "通常", "盤", "版", "セット", "楽天", "先着", "仕様", "ジャケット",
+    "DVD", "Blu-ray", "ブルーレイ", "アナログ", "店舗",
 )
 _BRACKETED = re.compile(r"【([^】]+)】|\[([^\]]+)\]|（([^）]+)）|\(([^)]+)\)|＜([^＞]+)＞")
 _VARIATION_SUFFIX = re.compile(
@@ -124,7 +125,7 @@ def _card(item: db.Item, price_row: db.PriceCache | None) -> dict:
         age = db.utcnow() - price_row.fetched_at
         if age <= dt.timedelta(hours=config.PRICE_TTL_HOURS):
             price = price_row.price
-    return {
+    card = {
         "title": item.title,
         "media": MEDIA_LABEL.get(item.media, item.media),
         "media_key": item.media,
@@ -136,19 +137,36 @@ def _card(item: db.Item, price_row: db.PriceCache | None) -> dict:
         "url": item.item_url,   # 楽天ドメインのみ（R6）
         "image": item.image_url,
         "fetched_at": item.meta_fetched_at.strftime("%Y-%m-%d %H:%M") + " UTC",
+        "first_seen_at": item.first_seen_at.isoformat() if item.first_seen_at else "",
+        "oshi_id": item.oshi_id,
         "is_upcoming": bool(item.sales_date_iso) and
                        item.sales_date_iso >= dt.date.today().isoformat(),
         "is_new": (item.sales_date_precision == "day" and
                    (dt.date.today() - dt.timedelta(days=7)).isoformat()
                    <= item.sales_date_iso <= dt.date.today().isoformat()),
     }
+    card["variation_key"] = _variation_key(item.title)
+    card["sales_month"] = (item.sales_date_iso or "")[:7]
+    return card
 
 
-def _cards_for(s, items: list[db.Item]) -> list[dict]:
+def _display_author(author: str, oshi_name: str, aliases: list[str]) -> str:
+    """推し名と同一人物だと確実に分かる完全一致だけ、見出し表記へ寄せる。"""
+    normalized = (author or "").strip().casefold()
+    same_person = {oshi_name.strip().casefold(), *(alias.strip().casefold() for alias in aliases)}
+    return oshi_name if normalized and normalized in same_person else author
+
+
+def _cards_for(s, items: list[db.Item], oshi: db.Oshi | None = None) -> list[dict]:
     codes = [i.item_code for i in items]
     prices = {p.item_code: p for p in
               s.query(db.PriceCache).filter(db.PriceCache.item_code.in_(codes)).all()} if codes else {}
-    return [_card(i, prices.get(i.item_code)) for i in items]
+    cards = [_card(i, prices.get(i.item_code)) for i in items]
+    if oshi is not None:
+        for card in cards:
+            card["author"] = _display_author(card["author"], oshi.name, oshi.aliases)
+            card["oshi_name"] = oshi.name
+    return cards
 
 
 def _variation_key(title: str) -> str:
@@ -163,13 +181,15 @@ def _variation_key(title: str) -> str:
 
 
 def _group_variations(cards: list[dict]) -> list[dict]:
-    """共通タイトルが十分長い商品だけを、表示順を保ったまままとめる。"""
+    """正規化タイトルと発売年月が一致する商品だけを、表示順を保ってまとめる。"""
     groups: list[dict] = []
-    by_key: dict[str, dict] = {}
+    by_key: dict[tuple[str, str], dict] = {}
     for card in cards:
-        key = _variation_key(card["title"])
-        # 短いタイトルは誤判定しやすいため、同名でも折りたたまない。
-        if len(key) < 8:
+        title_key = card.get("variation_key") or _variation_key(card["title"])
+        month_key = card.get("sales_month") or (card.get("sales_date_iso") or "")[:7]
+        key = (title_key, month_key)
+        # 「パプリカ」等の完全同名はまとめつつ、極端に短い名称は誤判定を避ける。
+        if len(title_key) < 4 or not month_key:
             groups.append({"representative": card, "variations": []})
             continue
         group = by_key.get(key)
@@ -180,6 +200,52 @@ def _group_variations(cards: list[dict]) -> list[dict]:
         else:
             group["variations"].append(card)
     return groups
+
+
+def _month_key(value: str) -> str | None:
+    """有効なYYYY-MM日付からYYYY-MMだけを返す。"""
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", value or ""):
+        return None
+    try:
+        parsed = dt.date.fromisoformat(value)
+    except ValueError:
+        return None
+    return f"{parsed.year:04d}-{parsed.month:02d}"
+
+
+def _select_initial_month(date_values: list[str], today: dt.date) -> tuple[int, int, bool]:
+    """今月→未来の直近月→過去の直近月の順で初期表示月を決める。"""
+    months = sorted({month for value in date_values if (month := _month_key(value))})
+    current = f"{today.year:04d}-{today.month:02d}"
+    if current in months:
+        selected = current
+        showing_history = False
+    else:
+        future = [month for month in months if month > current]
+        if future:
+            selected = future[0]
+            showing_history = False
+        else:
+            past = [month for month in months if month < current]
+            selected = past[-1] if past else current
+            showing_history = bool(past)
+    year, month = (int(part) for part in selected.split("-"))
+    return year, month, showing_history
+
+
+def _supply_month_neighbors(months: list[str], year: int, month: int) -> tuple[dict | None, dict | None]:
+    """空月を飛ばし、商品が存在する直前・直後の月を返す。"""
+    current = f"{year:04d}-{month:02d}"
+    before = [value for value in months if value < current]
+    after = [value for value in months if value > current]
+
+    def payload(value: str | None) -> dict | None:
+        if not value:
+            return None
+        y, m = (int(part) for part in value.split("-"))
+        return {"y": y, "m": m}
+
+    return payload(before[-1] if before else None), payload(after[0] if after else None)
 
 
 def _calendar_days(calendar: dict[int, list[dict]], year: int, month: int) -> list[dict]:
@@ -248,40 +314,67 @@ def top(request: Request):
 @app.get("/oshi/{oshi_id}", response_class=HTMLResponse)
 def oshi_page(request: Request, oshi_id: int, y: int | None = None, m: int | None = None):
     today = dt.date.today()
-    y, m = y or today.year, m or today.month
     with db.session() as s:
         oshi = s.get(db.Oshi, oshi_id)
         if oshi is None or oshi.hidden:
             raise HTTPException(404)
         oshi.last_viewed_at = db.utcnow()
         s.commit()
-        rows = s.query(db.Item).filter(db.Item.oshi_id == oshi_id, _purchasable()) \
-                .order_by(db.Item.sales_date_iso.desc()).all()
-        cards = _cards_for(s, rows)
-        cal = month_calendar(cards, y, m)
+
+        date_values = [value for (value,) in s.query(db.Item.sales_date_iso).filter(
+            db.Item.oshi_id == oshi_id, _purchasable(), db.Item.sales_date_iso != ""
+        ).all()]
+        available_months = sorted({month for value in date_values if (month := _month_key(value))})
+        showing_history = False
+        if y is None and m is None:
+            y, m, showing_history = _select_initial_month(date_values, today)
+        elif y is None or m is None or not (1 <= m <= 12 and 1900 <= y <= 2200):
+            raise HTTPException(400, "表示月が不正です")
+
+        month_prefix = f"{y:04d}-{m:02d}"
+        month_rows = s.query(db.Item).filter(
+            db.Item.oshi_id == oshi_id,
+            _purchasable(),
+            db.Item.sales_date_iso.like(f"{month_prefix}%"),
+        ).order_by(db.Item.sales_date_iso.asc(), db.Item.id.asc()).all()
+        month_cards = _cards_for(s, month_rows, oshi)
+        cal = month_calendar(month_cards, y, m)
         month_cards = [card for day_cards in cal.values() for card in day_cards]
         tab_counts = {
             key: sum(1 for card in month_cards if card["media_key"] == key)
             for key, _ in MEDIA_TABS
         }
-        newest = sorted(cards, key=lambda c: c["fetched_at"], reverse=False)
-        newest = [c for c in cards if c["is_new"]] + [c for c in cards if not c["is_new"]]
-        prev_y, prev_m = (y - 1, 12) if m == 1 else (y, m - 1)
-        next_y, next_m = (y + 1, 1) if m == 12 else (y, m + 1)
+
+        newest_query = s.query(db.Item).filter(db.Item.oshi_id == oshi_id, _purchasable())
+        newest_total = newest_query.count()
+        newest_rows = newest_query.order_by(
+            db.Item.first_seen_at.desc(), db.Item.id.desc()
+        ).limit(24).all()
+        newest = _cards_for(s, newest_rows, oshi)
+        prev_month, next_month = _supply_month_neighbors(available_months, y, m)
+
+        next_row = s.query(db.Item).filter(
+            db.Item.oshi_id == oshi_id,
+            _purchasable(),
+            db.Item.sales_date_iso >= max(today.isoformat(), f"{y:04d}-{m:02d}-01"),
+        ).order_by(db.Item.sales_date_iso.asc()).first()
+        next_release = _next_release(_cards_for(s, [next_row], oshi) if next_row else [], y, m, today)
         return templates.TemplateResponse(request, "oshi.html", {
             "oshi": {"id": oshi.id, "name": oshi.name},
             "tabs": [
                 {"key": key, "label": label, "count": tab_counts[key]}
                 for key, label in MEDIA_TABS
             ],
-            "cards": cards,
             "calendar": cal,
             "calendar_days": _calendar_days(cal, y, m),
             "calendar_total": len(month_cards),
             "year": y, "month": m,
-            "prev": {"y": prev_y, "m": prev_m}, "next": {"y": next_y, "m": next_m},
-            "next_release": _next_release(cards, y, m, today),
-            "newest": newest[:50],
+            "prev": prev_month, "next": next_month,
+            "next_release": next_release,
+            "showing_history": showing_history,
+            "newest_groups": _group_variations(newest),
+            "newest_total": newest_total,
+            "newest_loaded": len(newest),
         })
 
 
@@ -343,19 +436,91 @@ def api_search_status(job_id: str):
 
 
 @app.get("/api/oshi/{oshi_id}/summary")
-def api_oshi_summary(oshi_id: int):
-    """マイページ用サマリ（localStorageの推しIDから呼ばれる）。"""
+def api_oshi_summary(oshi_id: int, limit: int = Query(8, ge=1, le=12)):
+    """個人化表示用サマリ。1件の公開推しIDだけを受け取り、リストは受け取らない。"""
     with db.session() as s:
         oshi = s.get(db.Oshi, oshi_id)
         if oshi is None or oshi.hidden:
             raise HTTPException(404)
-        rows = s.query(db.Item).filter(db.Item.oshi_id == oshi_id, _purchasable()) \
-                .order_by(db.Item.sales_date_iso.desc()).limit(200).all()
-        cards = _cards_for(s, rows)
+        today = dt.date.today().isoformat()
+        base = s.query(db.Item).filter(db.Item.oshi_id == oshi_id, _purchasable())
+        future_rows = base.filter(db.Item.sales_date_iso >= today) \
+            .order_by(db.Item.sales_date_iso.asc(), db.Item.id.asc()).limit(limit).all()
+        recent_rows = base.order_by(db.Item.first_seen_at.desc(), db.Item.id.desc()).limit(limit).all()
+        latest_row = base.filter(db.Item.sales_date_iso < today, db.Item.sales_date_iso != "") \
+            .order_by(db.Item.sales_date_iso.desc(), db.Item.id.desc()).first()
+        date_values = [value for (value,) in s.query(db.Item.sales_date_iso).filter(
+            db.Item.oshi_id == oshi_id, _purchasable(), db.Item.sales_date_iso != ""
+        ).all()]
+        future_cards = _cards_for(s, future_rows, oshi)
+        recent_cards = _cards_for(s, recent_rows, oshi)
+        latest_cards = _cards_for(s, [latest_row], oshi) if latest_row else []
         return JSONResponse({
             "id": oshi.id, "name": oshi.name,
-            "upcoming": upcoming(cards, days=60)[:5],
-            "new_items": [c for c in cards if c["is_new"]][:5],
+            "upcoming": future_cards,
+            "recent": recent_cards,
+            "new_items": recent_cards,  # 旧クライアント互換
+            "latest_supply": latest_cards[0] if latest_cards else (recent_cards[0] if recent_cards else None),
+            "available_months": sorted({
+                month for value in date_values if (month := _month_key(value))
+            }),
+        })
+
+
+@app.get("/api/oshi/{oshi_id}/calendar")
+def api_oshi_calendar(
+    oshi_id: int,
+    y: int = Query(..., ge=1900, le=2200),
+    m: int = Query(..., ge=1, le=12),
+    limit: int = Query(48, ge=1, le=60),
+):
+    """統合カレンダー用の月別読取API。localStorageの内容は保存・収集しない。"""
+    with db.session() as s:
+        oshi = s.get(db.Oshi, oshi_id)
+        if oshi is None or oshi.hidden:
+            raise HTTPException(404)
+        query = s.query(db.Item).filter(
+            db.Item.oshi_id == oshi_id,
+            _purchasable(),
+            db.Item.sales_date_iso.like(f"{y:04d}-{m:02d}%"),
+        )
+        total = query.count()
+        rows = query.order_by(db.Item.sales_date_iso.asc(), db.Item.id.asc()).limit(limit).all()
+        cards = _cards_for(s, rows, oshi)
+        return JSONResponse({
+            "id": oshi.id,
+            "name": oshi.name,
+            "year": y,
+            "month": m,
+            "items": cards,
+            "total": total,
+            "truncated": total > len(cards),
+        })
+
+
+@app.get("/api/oshi/{oshi_id}/items")
+def api_oshi_items(
+    oshi_id: int,
+    offset: int = Query(0, ge=0, le=10000),
+    limit: int = Query(24, ge=1, le=24),
+):
+    """新着順を24件ずつ取得する読み取り専用API。マイ推しリストは受け取らない。"""
+    with db.session() as s:
+        oshi = s.get(db.Oshi, oshi_id)
+        if oshi is None or oshi.hidden:
+            raise HTTPException(404)
+        query = s.query(db.Item).filter(db.Item.oshi_id == oshi_id, _purchasable())
+        total = query.count()
+        rows = query.order_by(db.Item.first_seen_at.desc(), db.Item.id.desc()) \
+            .offset(offset).limit(limit).all()
+        cards = _cards_for(s, rows, oshi)
+        return JSONResponse({
+            "items": cards,
+            "groups": _group_variations(cards),
+            "offset": offset,
+            "next_offset": offset + len(cards),
+            "total": total,
+            "has_more": offset + len(cards) < total,
         })
 
 
