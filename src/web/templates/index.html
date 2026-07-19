@@ -10,9 +10,10 @@
     <label class="visually-hidden" for="search-input">推しの名前</label>
     <span class="search-icon" aria-hidden="true">⌕</span>
     <input id="search-input" type="search" maxlength="100" autocomplete="off"
-           placeholder="推しの名前（作家・アーティスト・声優など）" required>
+           placeholder="推しの名前を入力" aria-describedby="search-hint" required>
     <button id="search-submit" type="submit"><span class="button-label">検索</span><span class="button-spinner" aria-hidden="true" hidden></span></button>
   </form>
+  <p id="search-hint" class="search-hint">作家・アーティスト・声優などから検索できます</p>
   <div id="search-progress" class="search-progress" hidden>
     <progress id="search-bar" max="8" value="0" aria-labelledby="search-message"></progress>
     <p id="search-message">検索を開始しています</p>

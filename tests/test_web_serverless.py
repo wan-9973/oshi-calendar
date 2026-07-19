@@ -1,6 +1,7 @@
 """サーバーレスモード（同期検索・cron保護）のテスト。"""
 import importlib
 import re
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 
@@ -235,6 +236,19 @@ def test_soft_clean_ui_keeps_required_footer_on_every_page(monkeypatch, tmp_path
         assert "商品リンクは楽天アフィリエイトです" in body
         assert 'id="back-to-top"' in body
         assert 'id="page-skeleton"' in body
+
+
+def test_readability_styles_separate_desktop_and_mobile_layouts():
+    """PCをスマホ風の1列表示へ退行させず、375pxでは小さすぎる2列表示を避ける。"""
+    css = (Path(__file__).parents[1] / "src" / "web" / "static" / "style.css").read_text(
+        encoding="utf-8"
+    )
+    assert "@media (min-width: 901px)" in css
+    assert "grid-template-columns: minmax(0, 1fr) minmax(430px, 0.9fr)" in css
+    assert "@media (min-width: 1180px)" in css
+    assert "grid-template-columns: repeat(4, minmax(0, 1fr))" in css
+    assert "grid-template-columns: 112px minmax(0, 1fr)" in css
+    assert "font-size: 0.94rem" in css
 
 
 def test_empty_month_links_to_next_release_and_counts_media(monkeypatch, tmp_path):
