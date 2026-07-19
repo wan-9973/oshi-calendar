@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import datetime as dt
 import os
+import re
 import threading
 import time
 import uuid
@@ -46,6 +47,15 @@ templates.env.globals.update(
 MEDIA_TABS = [("book", "書籍"), ("cd", "CD"), ("dvd", "映像"), ("magazine", "雑誌"),
               ("game", "ゲーム"), ("ebook", "電子"), ("goods", "グッズ"), ("mixed", "その他")]
 MEDIA_LABEL = dict(MEDIA_TABS)
+WEEKDAY_LABELS = ("月", "火", "水", "木", "金", "土", "日")
+
+_VARIATION_MARKERS = (
+    "限定", "特典", "初回", "通常", "盤", "版", "セット", "楽天", "先着", "仕様", "ジャケット",
+)
+_BRACKETED = re.compile(r"【([^】]+)】|\[([^\]]+)\]|（([^）]+)）|\(([^)]+)\)|＜([^＞]+)＞")
+_VARIATION_SUFFIX = re.compile(
+    r"(?:\s*[-／/]\s*)?(?:初回限定盤?|通常盤|完全生産限定盤?|限定版|通常版|特装版|豪華版)\s*$"
+)
 
 
 def _purchasable():
@@ -141,6 +151,77 @@ def _cards_for(s, items: list[db.Item]) -> list[dict]:
     return [_card(i, prices.get(i.item_code)) for i in items]
 
 
+def _variation_key(title: str) -> str:
+    """特典・盤違いだけを保守的に除いた、カレンダー内グルーピング用のキー。"""
+    def keep_or_remove(match: re.Match) -> str:
+        label = next((part for part in match.groups() if part is not None), "")
+        return "" if any(marker in label for marker in _VARIATION_MARKERS) else match.group(0)
+
+    normalized = _BRACKETED.sub(keep_or_remove, title)
+    normalized = _VARIATION_SUFFIX.sub("", normalized)
+    return re.sub(r"\s+", " ", normalized).strip().casefold()
+
+
+def _group_variations(cards: list[dict]) -> list[dict]:
+    """共通タイトルが十分長い商品だけを、表示順を保ったまままとめる。"""
+    groups: list[dict] = []
+    by_key: dict[str, dict] = {}
+    for card in cards:
+        key = _variation_key(card["title"])
+        # 短いタイトルは誤判定しやすいため、同名でも折りたたまない。
+        if len(key) < 8:
+            groups.append({"representative": card, "variations": []})
+            continue
+        group = by_key.get(key)
+        if group is None:
+            group = {"representative": card, "variations": []}
+            by_key[key] = group
+            groups.append(group)
+        else:
+            group["variations"].append(card)
+    return groups
+
+
+def _calendar_days(calendar: dict[int, list[dict]], year: int, month: int) -> list[dict]:
+    """テンプレート向けに日付ラベルとバリエーション群を付与する。"""
+    days = []
+    for day, cards in sorted(calendar.items()):
+        if day == 0:
+            label = f"{month}月中（日付未確定）"
+        else:
+            weekday = WEEKDAY_LABELS[dt.date(year, month, day).weekday()]
+            label = f"{month}月{day}日（{weekday}）"
+        days.append({"day": day, "label": label, "groups": _group_variations(cards)})
+    return days
+
+
+def _next_release(cards: list[dict], year: int, month: int, today: dt.date) -> dict | None:
+    """空状態から移動できる、表示月以降かつ未来の直近発売日を返す。"""
+    try:
+        month_start = dt.date(year, month, 1)
+    except ValueError:
+        return None
+    threshold = max(today, month_start)
+    candidates: list[tuple[dt.date, dict]] = []
+    for card in cards:
+        try:
+            release = dt.date.fromisoformat(card.get("sales_date_iso") or "")
+        except ValueError:
+            continue
+        if release >= threshold:
+            candidates.append((release, card))
+    if not candidates:
+        return None
+    release, card = min(candidates, key=lambda pair: pair[0])
+    return {
+        "date": f"{release.year}年{release.month}月{release.day}日",
+        "days": (release - today).days,
+        "y": release.year,
+        "m": release.month,
+        "title": card["title"],
+    }
+
+
 # --- ページ -------------------------------------------------------------------
 @app.get("/", response_class=HTMLResponse)
 def top(request: Request):
@@ -178,15 +259,28 @@ def oshi_page(request: Request, oshi_id: int, y: int | None = None, m: int | Non
                 .order_by(db.Item.sales_date_iso.desc()).all()
         cards = _cards_for(s, rows)
         cal = month_calendar(cards, y, m)
+        month_cards = [card for day_cards in cal.values() for card in day_cards]
+        tab_counts = {
+            key: sum(1 for card in month_cards if card["media_key"] == key)
+            for key, _ in MEDIA_TABS
+        }
         newest = sorted(cards, key=lambda c: c["fetched_at"], reverse=False)
         newest = [c for c in cards if c["is_new"]] + [c for c in cards if not c["is_new"]]
         prev_y, prev_m = (y - 1, 12) if m == 1 else (y, m - 1)
         next_y, next_m = (y + 1, 1) if m == 12 else (y, m + 1)
         return templates.TemplateResponse(request, "oshi.html", {
             "oshi": {"id": oshi.id, "name": oshi.name},
-            "tabs": MEDIA_TABS, "cards": cards, "calendar": cal,
+            "tabs": [
+                {"key": key, "label": label, "count": tab_counts[key]}
+                for key, label in MEDIA_TABS
+            ],
+            "cards": cards,
+            "calendar": cal,
+            "calendar_days": _calendar_days(cal, y, m),
+            "calendar_total": len(month_cards),
             "year": y, "month": m,
             "prev": {"y": prev_y, "m": prev_m}, "next": {"y": next_y, "m": next_m},
+            "next_release": _next_release(cards, y, m, today),
             "newest": newest[:50],
         })
 

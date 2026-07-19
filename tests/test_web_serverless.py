@@ -1,5 +1,6 @@
 """サーバーレスモード（同期検索・cron保護）のテスト。"""
 import importlib
+import re
 from unittest.mock import MagicMock, patch
 
 
@@ -212,6 +213,79 @@ def test_unavailable_items_are_hidden_and_dates_emphasized(monkeypatch, tmp_path
     assert "入手不可の本" not in r.text
     assert 'class="date upcoming"' in r.text  # 発売前の強調
     assert "発売前" in r.text
+    assert '<a class="card"' in r.text
+    assert 'rel="nofollow sponsored"' in r.text
+    assert "時点の情報" in r.text
+    product_links = re.findall(r'<a class="card"[^>]*href="([^"]+)"', r.text)
+    assert product_links
+    assert all(url.startswith("https://hb.afl.rakuten.co.jp/") for url in product_links)
+
+
+def test_soft_clean_ui_keeps_required_footer_on_every_page(monkeypatch, tmp_path):
+    client, _ = make_app(monkeypatch, tmp_path)
+    from src import db
+    with db.session() as s:
+        oshi = db.Oshi(name="推しA", aliases_json="[]")
+        s.add(oshi)
+        s.commit()
+        oshi_id = oshi.id
+    for path in ("/", f"/oshi/{oshi_id}", "/my"):
+        body = client.get(path).text
+        assert "運営者:" in body
+        assert "商品リンクは楽天アフィリエイトです" in body
+        assert 'id="back-to-top"' in body
+        assert 'id="page-skeleton"' in body
+
+
+def test_empty_month_links_to_next_release_and_counts_media(monkeypatch, tmp_path):
+    import datetime as dt
+    client, _ = make_app(monkeypatch, tmp_path)
+    from src import db
+    today = dt.date.today()
+    next_month = (today.replace(day=28) + dt.timedelta(days=4)).replace(day=1)
+    release = next_month + dt.timedelta(days=8)
+    with db.session() as s:
+        oshi = db.Oshi(name="推しB", aliases_json="[]")
+        s.add(oshi)
+        s.flush()
+        s.add(db.Item(
+            oshi_id=oshi.id,
+            source_api="books_cd",
+            media="cd",
+            item_code="next-release",
+            title="十分に長い次回発売タイトル 初回限定盤",
+            author_or_artist="推しB",
+            sales_date=f"{release.year}年{release.month:02d}月{release.day:02d}日",
+            sales_date_iso=release.isoformat(),
+            sales_date_precision="day",
+            item_url="https://hb.afl.rakuten.co.jp/next",
+            availability=5,
+        ))
+        s.commit()
+        oshi_id = oshi.id
+
+    empty_page = client.get(f"/oshi/{oshi_id}?y={today.year}&m={today.month}").text
+    assert "この月の発売予定はありません。" in empty_page
+    assert f"次の発売予定: <strong>{release.year}年{release.month}月{release.day}日</strong>" in empty_page
+    assert f"?y={release.year}&m={release.month}" in empty_page
+
+    release_page = client.get(f"/oshi/{oshi_id}?y={release.year}&m={release.month}").text
+    assert re.search(r'data-tab="cd"[^>]*>CD <span class="count-badge">1</span>', release_page)
+    assert re.search(r'data-tab="book"[^>]*disabled', release_page)
+    assert f"{release.month}月{release.day}日" in release_page
+
+
+def test_variation_grouping_is_conservative(monkeypatch, tmp_path):
+    _, webapp = make_app(monkeypatch, tmp_path)
+    cards = [
+        {"title": "長い共通タイトルのアルバム【初回限定盤】"},
+        {"title": "長い共通タイトルのアルバム【通常盤】"},
+        {"title": "別の長いタイトルのアルバム"},
+    ]
+    groups = webapp._group_variations(cards)
+    assert len(groups) == 2
+    assert groups[0]["representative"]["title"].endswith("【初回限定盤】")
+    assert [card["title"] for card in groups[0]["variations"]] == [cards[1]["title"]]
 
 
 def test_save_results_persists_availability(monkeypatch, tmp_path):

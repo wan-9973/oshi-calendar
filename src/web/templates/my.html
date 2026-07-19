@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 {% block title %}マイ推しリスト - {{ site_name }}{% endblock %}
 {% block content %}
-<h1>マイ推しリスト</h1>
-<p class="note">このリストはお使いのブラウザにのみ保存されています。サーバーには送信されません。</p>
-<div id="my-list"><p class="empty">まだ推しが登録されていません。推しページの「☆ マイ推しリストに追加」から登録できます。</p></div>
+<section class="page-heading-card">
+  <div><p class="eyebrow">MY OSHI LIST</p><h1>マイ推しリスト</h1></div>
+  <p class="note">このリストはお使いのブラウザにのみ保存されています。サーバーには送信されません。</p>
+</section>
+<div id="my-list" class="my-list"><div class="empty-state"><span class="empty-illustration" aria-hidden="true">💗</span><h2>まだ推しが登録されていません</h2><p>推しページの「☆ マイ推しリストに追加」から登録できます。</p><a class="primary-link" href="/">推しを検索する</a></div></div>
 {% endblock %}
