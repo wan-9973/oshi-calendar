@@ -394,7 +394,9 @@ def test_oshi_page_normalizes_known_alias_display_only(monkeypatch, tmp_path):
     client, _ = make_app(monkeypatch, tmp_path)
     from src import db
     with db.session() as s:
-        oshi = db.Oshi(name="米津玄師", aliases_json='["Kenshi Yonezu"]')
+        # A legacy row can have been created before the shared public profile
+        # supplied its alias.  Rendering should still use the canonical name.
+        oshi = db.Oshi(name="米津玄師", aliases_json="[]")
         s.add(oshi)
         s.flush()
         s.add(db.Item(
