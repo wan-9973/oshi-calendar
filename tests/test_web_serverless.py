@@ -411,6 +411,64 @@ def test_oshi_page_normalizes_known_alias_display_only(monkeypatch, tmp_path):
         assert s.query(db.Item).filter_by(item_code="alias-item").one().author_or_artist == "Kenshi Yonezu"
 
 
+def test_personalization_summary_and_calendar_are_read_only_per_oshi(monkeypatch, tmp_path):
+    import datetime as dt
+    client, _ = make_app(monkeypatch, tmp_path)
+    from src import db
+    today = dt.date.today()
+    future = today + dt.timedelta(days=120)
+    past = today - dt.timedelta(days=45)
+    with db.session() as s:
+        oshi = db.Oshi(name="個人化推し", aliases_json="[]")
+        s.add(oshi)
+        s.flush()
+        for code, release in (("future-personal", future), ("past-personal", past)):
+            s.add(db.Item(
+                oshi_id=oshi.id, source_api="books_book", media="book", item_code=code,
+                title=f"個人化商品 {code}", author_or_artist="個人化推し",
+                sales_date=f"{release.year}年{release.month:02d}月{release.day:02d}日",
+                sales_date_iso=release.isoformat(), sales_date_precision="day",
+                item_url=f"https://hb.afl.rakuten.co.jp/{code}", availability=5,
+            ))
+        s.commit()
+        oshi_id = oshi.id
+
+    summary = client.get(f"/api/oshi/{oshi_id}/summary?limit=8")
+    assert summary.status_code == 200
+    body = summary.json()
+    assert body["id"] == oshi_id and body["name"] == "個人化推し"
+    assert body["upcoming"][0]["sales_date_iso"] == future.isoformat()  # 60日超も取得
+    assert body["latest_supply"]["sales_date_iso"] == past.isoformat()
+    assert f"{future.year:04d}-{future.month:02d}" in body["available_months"]
+    assert all(card["url"].startswith("https://hb.afl.rakuten.co.jp/") for card in body["recent"])
+    assert all(card["fetched_at"].endswith(" UTC") for card in body["recent"])
+
+    calendar = client.get(f"/api/oshi/{oshi_id}/calendar?y={future.year}&m={future.month}&limit=48")
+    assert calendar.status_code == 200
+    calendar_body = calendar.json()
+    assert calendar_body["total"] == 1
+    assert calendar_body["items"][0]["title"] == "個人化商品 future-personal"
+    assert calendar_body["items"][0]["oshi_name"] == "個人化推し"
+    assert client.get(f"/api/oshi/{oshi_id}/calendar?y={future.year}&m=13").status_code == 422
+
+
+def test_personalization_hooks_keep_local_storage_private(monkeypatch, tmp_path):
+    client, _ = make_app(monkeypatch, tmp_path)
+    top = client.get("/").text
+    my_page = client.get("/my").text
+    script = client.get("/static/app.js").text
+
+    assert 'id="personalized-section"' in top
+    assert 'id="my-calendar"' in my_page
+    assert 'id="export-list"' in my_page and 'id="import-list"' in my_page
+    assert "このリストはお使いのブラウザにのみ保存されています。サーバーには送信されません。" in my_page
+    assert "URLフラグメント" in my_page
+    assert '"#import="' in script
+    assert '"?import="' not in script  # インポート対象はHTTPリクエストへ載せない
+    assert "text/calendar;charset=utf-8" in script
+    assert "navigator.clipboard" in script
+
+
 def test_save_results_persists_availability(monkeypatch, tmp_path):
     client, webapp = make_app(monkeypatch, tmp_path)
     from src import db

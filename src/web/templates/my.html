@@ -3,7 +3,36 @@
 {% block content %}
 <section class="page-heading-card">
   <div><p class="eyebrow">MY OSHI LIST</p><h1>マイ推しリスト</h1></div>
-  <p class="note">このリストはお使いのブラウザにのみ保存されています。サーバーには送信されません。</p>
+  <div class="my-privacy">
+    <p class="note">このリストはお使いのブラウザにのみ保存されています。サーバーには送信されません。</p>
+    <p class="note">機種変更時はエクスポートをご利用ください。共有URLには推しIDだけを含み、URLフラグメントのためサーバーへ送信されません。</p>
+    <div class="transfer-actions">
+      <button id="export-list" class="secondary-button" type="button">エクスポート</button>
+      <button id="import-list" class="secondary-button" type="button">インポート</button>
+      <button id="import-help" class="text-button" type="button" aria-expanded="false" aria-controls="import-help-text">使い方</button>
+    </div>
+    <p id="import-help-text" class="note import-help" hidden>別端末でエクスポートURLを開くと、確認後に現在のリストへ追加されます。既存の推しは削除されません。</p>
+  </div>
 </section>
-<div id="my-list" class="my-list"><div class="empty-state"><span class="empty-illustration" aria-hidden="true">💗</span><h2>まだ推しが登録されていません</h2><p>推しページの「☆ マイ推しリストに追加」から登録できます。</p><a class="primary-link" href="/">推しを検索する</a></div></div>
+
+<section id="my-calendar" class="content-section my-calendar" hidden aria-busy="true">
+  <h2 class="section-title">みんなの供給をひとつに</h2>
+  <div class="calendar-toolbar my-calendar-toolbar">
+    <nav class="month-nav" aria-label="統合カレンダーの表示月">
+      <button id="my-calendar-prev" class="month-button" type="button">← <span>前の供給月</span></button>
+      <h2 id="my-calendar-month">読み込み中</h2>
+      <button id="my-calendar-next" class="month-button" type="button"><span>次の供給月</span> →</button>
+    </nav>
+  </div>
+  <div id="my-calendar-loading" class="skeleton-grid" aria-hidden="true">
+    {% for _ in range(4) %}<div class="skeleton-card"><div class="skeleton-image"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>{% endfor %}
+  </div>
+  <p id="my-calendar-note" class="note" role="status" aria-live="polite"></p>
+  <div id="my-calendar-timeline" class="timeline"></div>
+</section>
+
+<section class="content-section">
+  <h2 class="section-title">登録中の推し</h2>
+  <div id="my-list" class="my-list"><div class="empty-state"><span class="empty-illustration" aria-hidden="true">💗</span><h2>まだ推しが登録されていません</h2><p>推しページの「☆ マイ推しリストに追加」から登録できます。</p><a class="primary-link" href="/">推しを検索する</a></div></div>
+</section>
 {% endblock %}

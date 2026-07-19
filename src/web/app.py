@@ -436,19 +436,65 @@ def api_search_status(job_id: str):
 
 
 @app.get("/api/oshi/{oshi_id}/summary")
-def api_oshi_summary(oshi_id: int):
-    """マイページ用サマリ（localStorageの推しIDから呼ばれる）。"""
+def api_oshi_summary(oshi_id: int, limit: int = Query(8, ge=1, le=12)):
+    """個人化表示用サマリ。1件の公開推しIDだけを受け取り、リストは受け取らない。"""
     with db.session() as s:
         oshi = s.get(db.Oshi, oshi_id)
         if oshi is None or oshi.hidden:
             raise HTTPException(404)
-        rows = s.query(db.Item).filter(db.Item.oshi_id == oshi_id, _purchasable()) \
-                .order_by(db.Item.sales_date_iso.desc()).limit(200).all()
-        cards = _cards_for(s, rows)
+        today = dt.date.today().isoformat()
+        base = s.query(db.Item).filter(db.Item.oshi_id == oshi_id, _purchasable())
+        future_rows = base.filter(db.Item.sales_date_iso >= today) \
+            .order_by(db.Item.sales_date_iso.asc(), db.Item.id.asc()).limit(limit).all()
+        recent_rows = base.order_by(db.Item.first_seen_at.desc(), db.Item.id.desc()).limit(limit).all()
+        latest_row = base.filter(db.Item.sales_date_iso < today, db.Item.sales_date_iso != "") \
+            .order_by(db.Item.sales_date_iso.desc(), db.Item.id.desc()).first()
+        date_values = [value for (value,) in s.query(db.Item.sales_date_iso).filter(
+            db.Item.oshi_id == oshi_id, _purchasable(), db.Item.sales_date_iso != ""
+        ).all()]
+        future_cards = _cards_for(s, future_rows, oshi)
+        recent_cards = _cards_for(s, recent_rows, oshi)
+        latest_cards = _cards_for(s, [latest_row], oshi) if latest_row else []
         return JSONResponse({
             "id": oshi.id, "name": oshi.name,
-            "upcoming": upcoming(cards, days=60)[:5],
-            "new_items": [c for c in cards if c["is_new"]][:5],
+            "upcoming": future_cards,
+            "recent": recent_cards,
+            "new_items": recent_cards,  # 旧クライアント互換
+            "latest_supply": latest_cards[0] if latest_cards else (recent_cards[0] if recent_cards else None),
+            "available_months": sorted({
+                month for value in date_values if (month := _month_key(value))
+            }),
+        })
+
+
+@app.get("/api/oshi/{oshi_id}/calendar")
+def api_oshi_calendar(
+    oshi_id: int,
+    y: int = Query(..., ge=1900, le=2200),
+    m: int = Query(..., ge=1, le=12),
+    limit: int = Query(48, ge=1, le=60),
+):
+    """統合カレンダー用の月別読取API。localStorageの内容は保存・収集しない。"""
+    with db.session() as s:
+        oshi = s.get(db.Oshi, oshi_id)
+        if oshi is None or oshi.hidden:
+            raise HTTPException(404)
+        query = s.query(db.Item).filter(
+            db.Item.oshi_id == oshi_id,
+            _purchasable(),
+            db.Item.sales_date_iso.like(f"{y:04d}-{m:02d}%"),
+        )
+        total = query.count()
+        rows = query.order_by(db.Item.sales_date_iso.asc(), db.Item.id.asc()).limit(limit).all()
+        cards = _cards_for(s, rows, oshi)
+        return JSONResponse({
+            "id": oshi.id,
+            "name": oshi.name,
+            "year": y,
+            "month": m,
+            "items": cards,
+            "total": total,
+            "truncated": total > len(cards),
         })
 
 
