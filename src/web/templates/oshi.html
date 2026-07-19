@@ -2,36 +2,59 @@
 {% from "_card.html" import card %}
 {% block title %}{{ oshi.name }} - {{ site_name }}{% endblock %}
 {% block content %}
-<h1>{{ oshi.name }} の供給カレンダー</h1>
-<p><button id="fav-btn" data-oshi-id="{{ oshi.id }}" data-oshi-name="{{ oshi.name }}">☆ マイ推しリストに追加</button></p>
-
-<section class="calendar">
-  <h2>
-    <a href="/oshi/{{ oshi.id }}?y={{ prev.y }}&m={{ prev.m }}">&laquo;</a>
-    {{ year }}年{{ month }}月
-    <a href="/oshi/{{ oshi.id }}?y={{ next.y }}&m={{ next.m }}">&raquo;</a>
-  </h2>
-  {% if calendar %}
-    <dl class="cal-list">
-    {% for day, cs in calendar | dictsort %}
-      <dt>{% if day == 0 %}{{ month }}月中（日付未確定）{% else %}{{ month }}/{{ day }}{% endif %}</dt>
-      {% for c in cs %}<dd>{{ card(c) }}</dd>{% endfor %}
-    {% endfor %}
-    </dl>
-  {% else %}<p class="empty">この月の発売予定はありません。</p>{% endif %}
+<section class="oshi-hero">
+  <div><p class="eyebrow">OSHI SUPPLY CALENDAR</p><h1>{{ oshi.name }} の供給カレンダー</h1></div>
+  <button id="fav-btn" class="favorite-button" type="button" aria-pressed="false" data-oshi-id="{{ oshi.id }}" data-oshi-name="{{ oshi.name }}">☆ マイ推しリストに追加</button>
 </section>
 
-<section>
-  <h2>媒体別</h2>
-  <div class="tabs">
-    <button class="tab active" data-tab="all">すべて</button>
-    {% for key, label in tabs %}<button class="tab" data-tab="{{ key }}">{{ label }}</button>{% endfor %}
+<section class="calendar-section">
+  <div class="calendar-toolbar">
+    <nav class="month-nav" aria-label="表示月の変更">
+      <a class="month-button" href="/oshi/{{ oshi.id }}?y={{ prev.y }}&m={{ prev.m }}" aria-label="前月へ">← <span>前月</span></a>
+      <h2>{{ year }}年{{ month }}月</h2>
+      <a class="month-button" href="/oshi/{{ oshi.id }}?y={{ next.y }}&m={{ next.m }}" aria-label="翌月へ"><span>翌月</span> →</a>
+    </nav>
+    <div class="filter-scroller" role="group" aria-label="媒体別フィルタ">
+      <button class="tab active" type="button" data-tab="all" aria-pressed="true">すべて <span class="count-badge">{{ calendar_total }}</span></button>
+      {% for tab in tabs %}<button class="tab" type="button" data-tab="{{ tab.key }}" aria-pressed="false"{% if tab.count == 0 %} disabled aria-disabled="true"{% endif %}>{{ tab.label }} <span class="count-badge">{{ tab.count }}</span></button>{% endfor %}
+    </div>
   </div>
-  <div class="grid" id="tab-grid">{% for c in cards %}{{ card(c) }}{% endfor %}</div>
+  {% if calendar_days %}
+    <div class="timeline" id="calendar-timeline">
+    {% for date in calendar_days %}
+      <section class="timeline-day" data-date-group>
+        <h2><span class="timeline-dot" aria-hidden="true"></span>{{ date.label }}</h2>
+        <div class="timeline-grid">
+          {% for group in date.groups %}
+          <div class="variation-group" data-variation-group>
+            {{ card(group.representative) }}
+            {% if group.variations %}
+            <details class="variations">
+              <summary>他{{ group.variations | length }}件のバリエーション</summary>
+              <div class="grid variation-grid">{% for c in group.variations %}{{ card(c) }}{% endfor %}</div>
+            </details>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      </section>
+    {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state calendar-empty">
+      <span class="empty-illustration" aria-hidden="true">🗓️</span>
+      <h2>この月の発売予定はありません。</h2>
+      {% if next_release %}
+        <p>次の発売予定: <strong>{{ next_release.date }}</strong>（あと{{ next_release.days }}日）</p>
+        <p class="next-release-title">{{ next_release.title }}</p>
+        <a class="primary-link" href="/oshi/{{ oshi.id }}?y={{ next_release.y }}&m={{ next_release.m }}">次の発売月へ</a>
+      {% else %}<p>現在登録されている未来の発売予定はありません。</p>{% endif %}
+    </div>
+  {% endif %}
 </section>
 
-<section>
-  <h2>新着順</h2>
+<section class="content-section">
+  <h2 class="section-title">新着順</h2>
   <div class="grid">{% for c in newest %}{{ card(c) }}{% endfor %}</div>
 </section>
 {% endblock %}
