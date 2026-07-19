@@ -163,8 +163,13 @@ def _cards_for(s, items: list[db.Item], oshi: db.Oshi | None = None) -> list[dic
               s.query(db.PriceCache).filter(db.PriceCache.item_code.in_(codes)).all()} if codes else {}
     cards = [_card(i, prices.get(i.item_code)) for i in items]
     if oshi is not None:
+        # Older rows may predate a public entity profile and therefore have no
+        # aliases stored in the DB.  Merge profile aliases only for display so
+        # legacy data also renders the canonical oshi name without a migration.
+        profile = profile_for(oshi.name)
+        aliases = [*oshi.aliases, *((profile or {}).get("aliases") or [])]
         for card in cards:
-            card["author"] = _display_author(card["author"], oshi.name, oshi.aliases)
+            card["author"] = _display_author(card["author"], oshi.name, aliases)
             card["oshi_name"] = oshi.name
     return cards
 

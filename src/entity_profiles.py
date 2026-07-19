@@ -31,5 +31,15 @@ PROFILES = {
 
 
 def profile_for(name: str) -> dict | None:
-    profile = PROFILES.get(_key(name))
+    name_key = _key(name)
+    profile = PROFILES.get(name_key)
+    if profile is None:
+        # Once an ambiguous search name has been resolved, the DB stores the
+        # canonical name.  Keep the same public profile available on later
+        # page views and crawls without rewriting existing rows.
+        profile = next(
+            (candidate for candidate in PROFILES.values()
+             if _key(candidate.get("canonical_name", "")) == name_key),
+            None,
+        )
     return dict(profile) if profile else None
