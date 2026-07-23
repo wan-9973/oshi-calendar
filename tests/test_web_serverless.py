@@ -501,3 +501,28 @@ def test_save_results_persists_availability(monkeypatch, tmp_path):
     with db.session() as s:
         row = s.query(db.Item).filter(db.Item.item_code == "b1").one()
         assert row.availability == 5
+
+
+def test_display_filter_hides_preexisting_noise(monkeypatch, tmp_path):
+    """フィルタ導入前に保存済みの中古・楽譜行も表示クエリで除外される。"""
+    client, webapp = make_app(monkeypatch, tmp_path)
+    from src import db
+    with db.session() as s:
+        o = db.Oshi(name="米津玄師")
+        s.add(o)
+        s.flush()
+        oid = o.id
+        common = dict(oshi_id=oid, source_api="books_cd", media="cd",
+                      item_url="https://hb.afl.rakuten.co.jp/x", availability=1,
+                      sales_date_iso="2025-09-24", sales_date_precision="day")
+        s.add(db.Item(item_code="ok1", title="LOST CORNER (通常盤)", **common))
+        s.add(db.Item(item_code="ng1", title="【中古】(CD)BOOTLEG／米津玄師", **common))
+        s.add(db.Item(item_code="ng2", title="バンドスコア 米津玄師", **common))
+        s.commit()
+    # 新着順API（一覧）
+    r = client.get(f"/api/oshi/{oid}/items")
+    assert r.status_code == 200
+    titles = [it["title"] for it in r.json()["items"]]
+    assert "LOST CORNER (通常盤)" in titles
+    assert all("中古" not in t and "バンドスコア" not in t for t in titles)
+    assert r.json()["total"] == 1

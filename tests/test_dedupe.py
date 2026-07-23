@@ -100,3 +100,50 @@ def test_ambiguous_anchor_in_caption_passes():
                               caption="HANA（BMSG）ロングインタビュー掲載"),
                           "HANA", [], ["BMSG"])
     assert got > 0.0
+
+
+# --- 幅が広すぎる関連商品（中古・楽譜・カラオケ等）の除外 -------------------
+def test_is_noise_used_and_sheet_music_and_karaoke():
+    from src.dedupe import is_noise
+    assert is_noise(rec(title="【中古】(CD)BOOTLEG／米津玄師"))
+    assert is_noise(rec(title="バンドスコアピース 感電 ／ 米津玄師"))
+    assert is_noise(rec(title="やさしく弾けるピアノピース Lemon"))
+    assert is_noise(rec(title="カラオケ JOYSOUND 米津玄師メドレー"))
+    # 著者/店名側に楽譜専門店が入るケースも除外
+    assert is_noise(rec(title="Lemon", author_or_artist="楽譜 スコアオンライン"))
+    # 通常の公式商品は除外しない
+    assert not is_noise(rec(title="IRIS OUT / JANE DOE (通常盤)"))
+    assert not is_noise(rec(title="Lemon", author_or_artist="米津玄師"))
+
+
+def test_is_noise_respects_switch(monkeypatch):
+    from src.dedupe import is_noise
+    monkeypatch.setattr(config, "FILTER_NOISE", False)
+    assert not is_noise(rec(title="【中古】(CD)BOOTLEG／米津玄師"))
+
+
+def test_merge_drops_noise_records():
+    used = rec(title="【中古】YANKEE／米津玄師", item_code="u1", source_api="ichiba",
+               media="goods")
+    score = rec(title="バンドスコア 米津玄師", item_code="s1", source_api="books_total",
+                media="mixed")
+    ok = rec(title="LOST CORNER (通常盤)", item_code="9784000000001", media="cd",
+             source_api="books_cd", trusted_field_match=True)
+    got = merge([used, score, ok], "米津玄師", [])
+    titles = [r["title"] for r in got]
+    assert "LOST CORNER (通常盤)" in titles
+    assert all("中古" not in t and "バンドスコア" not in t for t in titles)
+
+
+def test_merge_drops_caption_only_broad_match():
+    # 説明文だけに名前 → 信頼フィールド検索でなければ既定で非表示
+    caption_only = rec(title="無関係タイトル", caption="米津玄師のトリビュート",
+                       item_code="c1", source_api="ichiba", media="goods")
+    assert merge([caption_only], "米津玄師", []) == []
+
+
+def test_merge_keeps_caption_match_when_enabled(monkeypatch):
+    monkeypatch.setattr(config, "SHOW_CAPTION_ONLY", True)
+    caption_only = rec(title="無関係タイトル", caption="米津玄師のトリビュート",
+                       item_code="c2", source_api="ichiba", media="goods")
+    assert len(merge([caption_only], "米津玄師", [])) == 1
