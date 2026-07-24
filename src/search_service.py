@@ -92,6 +92,12 @@ def _items_of(resp: dict) -> list[dict]:
     return out
 
 
+def _ng_keyword() -> dict:
+    """キーワード検索系APIに渡す除外語（NGKeyword）。未設定なら付与しない。"""
+    kw = (config.NG_SEARCH_KEYWORDS or "").strip()
+    return {"NGKeyword": kw} if kw else {}
+
+
 # 検索プラン（docs/phase0_field_mapping.md §3）。1推し名あたり8リクエスト。
 def _plan(name: str) -> list[tuple[str, str, dict, bool]]:
     common_books = {"sort": "-releaseDate", "outOfStockFlag": 1, "hits": 30}
@@ -102,8 +108,10 @@ def _plan(name: str) -> list[tuple[str, str, dict, bool]]:
         ("books_magazine", "magazine", {"title": name, **common_books}, False),
         ("books_game", "game", {"title": name, **common_books}, False),
         ("kobo", "ebook", {"author": name, "hits": 30}, True),
-        ("ichiba", "goods", {"keyword": name, "sort": "-updateTimestamp", "hits": 30}, False),
-        ("books_total", "mixed", {"keyword": name, "hits": 30, "outOfStockFlag": 1}, False),
+        ("ichiba", "goods", {"keyword": name, "sort": "-updateTimestamp", "hits": 30,
+                              **_ng_keyword()}, False),
+        ("books_total", "mixed", {"keyword": name, "hits": 30, "outOfStockFlag": 1,
+                                  **_ng_keyword()}, False),
     ]
 
 

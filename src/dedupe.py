@@ -77,6 +77,20 @@ def is_excluded(record: dict) -> bool:
     return any(normalize(w) in hay for w in config.NG_WORDS)
 
 
+def is_noise(record: dict) -> bool:
+    """幅が広すぎる周辺商品（中古・楽譜/スコア・カラオケ等）を判定して既定で除外。
+
+    個人が「推し本人の新刊・新譜・発売予定」を見つけやすくするためのフィルタ。
+    タイトルまたは著者/アーティスト欄にNG_NOISE_WORDSを含む商品を対象にする。
+    config.FILTER_NOISE=False（環境変数OSHI_FILTER_NOISE=0）で無効化できる。
+    """
+    if not config.FILTER_NOISE:
+        return False
+    hay = normalize(" ".join([record.get("title", ""),
+                              record.get("author_or_artist", "")]))
+    return any(normalize(w) in hay for w in config.NG_NOISE_WORDS)
+
+
 # 名寄せ優先度: 実物メディア > 電子 > 市場（同一商品コードのとき）
 _SOURCE_PRIORITY = {"books_book": 0, "books_cd": 0, "books_dvd": 0,
                     "books_magazine": 0, "books_game": 0, "books_total": 1,
@@ -95,10 +109,16 @@ def merge(records: list[dict], name: str, aliases: list[str], anchors: list[str]
     anchors = anchors or []
     best: dict[str, dict] = {}
     for r in records:
-        if is_excluded(r):
+        if is_excluded(r) or is_noise(r):
             continue
         score = relevance_score(r, name, aliases, anchors)
         if score < config.SCORE_THRESHOLD:
+            continue
+        # 説明文だけに名前が出る「幅が広すぎる関連商品」は、信頼フィールド
+        # （author/artistName）検索の結果以外では既定で除外する。
+        if (not config.SHOW_CAPTION_ONLY
+                and not r.get("trusted_field_match")
+                and score <= config.SCORE_CAPTION_MATCH):
             continue
         r = {**r, "relevance": score}
         key = dedupe_key(r)

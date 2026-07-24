@@ -17,7 +17,7 @@ from collections import defaultdict, deque
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query, Request
-from sqlalchemy import or_
+from sqlalchemy import and_, not_, or_, true
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -63,6 +63,29 @@ def _purchasable():
     """購入不可（品切れ・販売終了・入手不可等）の商品を表示から除外する条件。NULL=不明は表示。"""
     return or_(db.Item.availability.is_(None),
                db.Item.availability.in_(config.PURCHASABLE_AVAILABILITY))
+
+
+def _not_noise():
+    """幅が広すぎる周辺商品（中古・楽譜/スコア・カラオケ等）を表示から除外する条件。
+
+    取得時フィルタ（dedupe.is_noise）に加え、表示時にも同じ語で弾くことで、
+    フィルタ導入前に保存済みの既存データも即座にクリーンにする。
+    config.FILTER_NOISE=False で無効化できる。
+    """
+    if not config.FILTER_NOISE or not config.NG_NOISE_WORDS:
+        return true()
+    conds = []
+    for w in config.NG_NOISE_WORDS:
+        like = f"%{w}%"
+        conds.append(not_(db.Item.title.like(like)))
+        conds.append(or_(db.Item.author_or_artist.is_(None),
+                         not_(db.Item.author_or_artist.like(like))))
+    return and_(*conds)
+
+
+def _visible():
+    """一覧・カレンダー表示に用いる共通の可視条件（購入可能かつ非ノイズ）。"""
+    return and_(_purchasable(), _not_noise())
 
 # --- 検索ジョブ（インメモリ） -------------------------------------------------
 _jobs: dict[str, dict] = {}
@@ -303,12 +326,12 @@ def top(request: Request):
             .filter(db.Item.sales_date_precision == "day",
                     db.Item.sales_date_iso >= week_ago,
                     db.Item.sales_date_iso <= today,
-                    db.Oshi.hidden == 0, _purchasable()) \
+                    db.Oshi.hidden == 0, _visible()) \
             .order_by(db.Item.sales_date_iso.desc()).limit(30).all()
         horizon = (dt.date.today() + dt.timedelta(days=60)).isoformat()
         up_rows = s.query(db.Item).join(db.Oshi, db.Oshi.id == db.Item.oshi_id) \
             .filter(db.Item.sales_date_iso >= today, db.Item.sales_date_iso <= horizon,
-                    db.Oshi.hidden == 0, _purchasable()) \
+                    db.Oshi.hidden == 0, _visible()) \
             .order_by(db.Item.sales_date_iso.asc()).limit(60).all()
         return templates.TemplateResponse(request, "index.html", {
             "new_items": _cards_for(s, new_rows),
@@ -327,7 +350,7 @@ def oshi_page(request: Request, oshi_id: int, y: int | None = None, m: int | Non
         s.commit()
 
         date_values = [value for (value,) in s.query(db.Item.sales_date_iso).filter(
-            db.Item.oshi_id == oshi_id, _purchasable(), db.Item.sales_date_iso != ""
+            db.Item.oshi_id == oshi_id, _visible(), db.Item.sales_date_iso != ""
         ).all()]
         available_months = sorted({month for value in date_values if (month := _month_key(value))})
         showing_history = False
@@ -339,7 +362,7 @@ def oshi_page(request: Request, oshi_id: int, y: int | None = None, m: int | Non
         month_prefix = f"{y:04d}-{m:02d}"
         month_rows = s.query(db.Item).filter(
             db.Item.oshi_id == oshi_id,
-            _purchasable(),
+            _visible(),
             db.Item.sales_date_iso.like(f"{month_prefix}%"),
         ).order_by(db.Item.sales_date_iso.asc(), db.Item.id.asc()).all()
         month_cards = _cards_for(s, month_rows, oshi)
@@ -350,7 +373,7 @@ def oshi_page(request: Request, oshi_id: int, y: int | None = None, m: int | Non
             for key, _ in MEDIA_TABS
         }
 
-        newest_query = s.query(db.Item).filter(db.Item.oshi_id == oshi_id, _purchasable())
+        newest_query = s.query(db.Item).filter(db.Item.oshi_id == oshi_id, _visible())
         newest_total = newest_query.count()
         newest_rows = newest_query.order_by(
             db.Item.first_seen_at.desc(), db.Item.id.desc()
@@ -360,7 +383,7 @@ def oshi_page(request: Request, oshi_id: int, y: int | None = None, m: int | Non
 
         next_row = s.query(db.Item).filter(
             db.Item.oshi_id == oshi_id,
-            _purchasable(),
+            _visible(),
             db.Item.sales_date_iso >= max(today.isoformat(), f"{y:04d}-{m:02d}-01"),
         ).order_by(db.Item.sales_date_iso.asc()).first()
         next_release = _next_release(_cards_for(s, [next_row], oshi) if next_row else [], y, m, today)
@@ -448,14 +471,14 @@ def api_oshi_summary(oshi_id: int, limit: int = Query(8, ge=1, le=12)):
         if oshi is None or oshi.hidden:
             raise HTTPException(404)
         today = dt.date.today().isoformat()
-        base = s.query(db.Item).filter(db.Item.oshi_id == oshi_id, _purchasable())
+        base = s.query(db.Item).filter(db.Item.oshi_id == oshi_id, _visible())
         future_rows = base.filter(db.Item.sales_date_iso >= today) \
             .order_by(db.Item.sales_date_iso.asc(), db.Item.id.asc()).limit(limit).all()
         recent_rows = base.order_by(db.Item.first_seen_at.desc(), db.Item.id.desc()).limit(limit).all()
         latest_row = base.filter(db.Item.sales_date_iso < today, db.Item.sales_date_iso != "") \
             .order_by(db.Item.sales_date_iso.desc(), db.Item.id.desc()).first()
         date_values = [value for (value,) in s.query(db.Item.sales_date_iso).filter(
-            db.Item.oshi_id == oshi_id, _purchasable(), db.Item.sales_date_iso != ""
+            db.Item.oshi_id == oshi_id, _visible(), db.Item.sales_date_iso != ""
         ).all()]
         future_cards = _cards_for(s, future_rows, oshi)
         recent_cards = _cards_for(s, recent_rows, oshi)
@@ -486,7 +509,7 @@ def api_oshi_calendar(
             raise HTTPException(404)
         query = s.query(db.Item).filter(
             db.Item.oshi_id == oshi_id,
-            _purchasable(),
+            _visible(),
             db.Item.sales_date_iso.like(f"{y:04d}-{m:02d}%"),
         )
         total = query.count()
@@ -514,7 +537,7 @@ def api_oshi_items(
         oshi = s.get(db.Oshi, oshi_id)
         if oshi is None or oshi.hidden:
             raise HTTPException(404)
-        query = s.query(db.Item).filter(db.Item.oshi_id == oshi_id, _purchasable())
+        query = s.query(db.Item).filter(db.Item.oshi_id == oshi_id, _visible())
         total = query.count()
         rows = query.order_by(db.Item.first_seen_at.desc(), db.Item.id.desc()) \
             .offset(offset).limit(limit).all()
