@@ -207,10 +207,11 @@
     }
     if (card.price !== null && card.price !== undefined) {
       appendTextElement(details, "p", "price", new Intl.NumberFormat("ja-JP").format(card.price) + "円（税込）");
+      appendTextElement(details, "p", "fetched", "[" + (card.price_fetched_at || card.fetched_at) + "] 時点の価格");
     } else {
       appendTextElement(details, "p", "price unavailable", "最新価格は楽天でご確認ください");
+      appendTextElement(details, "p", "fetched", "[" + card.fetched_at + "] 時点の商品情報");
     }
-    appendTextElement(details, "p", "fetched", "[" + card.fetched_at + "] 時点の情報");
     body.appendChild(details);
     link.appendChild(body);
     shell.appendChild(link);
