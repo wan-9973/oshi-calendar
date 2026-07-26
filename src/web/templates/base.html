@@ -15,7 +15,10 @@
   <a class="logo" href="/" aria-label="{{ site_name }} トップへ"><span aria-hidden="true">🗓️</span>{{ site_name }}</a>
   <nav aria-label="メインナビゲーション"><a class="my-list-link" href="/my">マイ推しリスト</a></nav>
 </header>
-<main>{% block content %}{% endblock %}</main>
+<main>
+  <p class="affiliate-disclosure" role="note">商品リンクには楽天アフィリエイトリンクを使用しています。</p>
+  {% block content %}{% endblock %}
+</main>
 <footer class="site-footer">
   <p class="disclaimer">{{ disclaimer }}</p>
   <p class="operator">運営者: {{ operator_name }}</p>
