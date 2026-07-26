@@ -348,8 +348,7 @@ main {
 .price.unavailable { color: var(--muted); font-size: 0.74rem; font-weight: 500; }
 .fetched { margin: 0; color: var(--muted); font-size: 0.68rem; line-height: 1.45; }
 
-.oshi-hero,
-.page-heading-card {
+.oshi-hero {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -361,7 +360,7 @@ main {
   border-radius: var(--card-radius);
   box-shadow: var(--shadow);
 }
-.oshi-hero h1, .page-heading-card h1 { margin: 0; font-size: clamp(1.55rem, 3.5vw, 2.25rem); }
+.oshi-hero h1 { margin: 0; font-size: clamp(1.55rem, 3.5vw, 2.25rem); }
 .favorite-button { flex: 0 0 auto; min-width: 220px; }
 .favorite-button.is-active { color: var(--accent-strong); background: var(--accent-soft); box-shadow: none; }
 .favorite-button.is-active:hover { color: var(--accent-strong); background: #F9DFE5; }
@@ -531,33 +530,6 @@ main {
 .secondary-button:disabled { cursor: wait; opacity: 0.68; }
 .load-more-count { color: var(--muted); font-size: 0.82rem; font-weight: 500; }
 
-.page-heading-card { align-items: flex-start; }
-.page-heading-card .note { max-width: 520px; margin: 4px 0 0; }
-.my-privacy { max-width: 560px; }
-.transfer-actions { display: flex; align-items: center; margin-top: 14px; gap: 8px; flex-wrap: wrap; }
-.transfer-actions .secondary-button { min-height: 44px; padding: 8px 14px; }
-.text-button {
-  min-height: 44px;
-  padding: 8px 10px;
-  color: var(--accent-strong);
-  background: transparent;
-  border: 0;
-  border-radius: var(--control-radius);
-  font-weight: 700;
-  cursor: pointer;
-}
-.text-button:hover { background: var(--accent-soft); }
-.import-help { padding: 8px 12px; background: var(--surface-soft); border-radius: var(--control-radius); }
-.export-url-label { display: grid; margin-top: 12px; color: var(--muted); font-size: 0.76rem; font-weight: 700; gap: 5px; }
-.export-url-label input {
-  width: 100%;
-  min-height: 44px;
-  padding: 8px 10px;
-  color: var(--ink);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--control-radius);
-}
 .my-calendar { margin-top: 0; }
 .my-calendar-toolbar { position: relative; top: auto; }
 .my-list { display: grid; gap: 24px; }
@@ -778,9 +750,8 @@ main {
   .price { margin-bottom: 7px; font-size: 0.92rem; }
   .price.unavailable { font-size: 0.74rem; line-height: 1.55; }
   .fetched { font-size: 0.69rem; line-height: 1.55; }
-  .oshi-hero, .page-heading-card { align-items: stretch; margin-bottom: 24px; padding: 20px 18px; flex-direction: column; }
-  .oshi-hero h1, .page-heading-card h1 { font-size: 1.42rem; }
-  .page-heading-card .note { font-size: 0.88rem; line-height: 1.75; }
+  .oshi-hero { align-items: stretch; margin-bottom: 24px; padding: 20px 18px; flex-direction: column; }
+  .oshi-hero h1 { font-size: 1.42rem; }
   .favorite-button { width: 100%; min-width: 0; }
   .calendar-notice { font-size: 0.86rem; line-height: 1.7; }
   .calendar-toolbar { margin-right: -16px; margin-left: -16px; padding: 10px 16px 12px; border-right: 0; border-left: 0; border-radius: 0; }
@@ -804,8 +775,6 @@ main {
   .oshi-order-actions { width: 100%; }
   .remove-button { margin-left: auto; }
   .my-summary-grid { grid-template-columns: minmax(0, 1fr); }
-  .transfer-actions { display: grid; grid-template-columns: 1fr 1fr; }
-  .transfer-actions .text-button { grid-column: 1 / -1; }
   .my-calendar .month-button span { display: inline; }
   .summary li { padding: 10px; }
   .site-footer { padding: 28px 16px; }

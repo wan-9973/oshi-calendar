@@ -494,7 +494,7 @@
     });
   }
 
-  /* --- マイページ: localStorageだけで統合カレンダー・移行・並べ替え --- */
+  /* --- マイページ: localStorageだけで統合カレンダー・並べ替え --- */
   var myList = document.getElementById("my-list");
   if (myList) {
     var myCalendar = document.getElementById("my-calendar");
@@ -510,63 +510,6 @@
       myList.innerHTML = '<div class="empty-state"><span class="empty-illustration" aria-hidden="true">💗</span>' +
         '<h2>まだ推しが登録されていません</h2><p>推しページの「☆ マイ推しリストに追加」から登録できます。</p>' +
         '<a class="primary-link" href="/">推しを検索する</a></div>';
-    };
-
-    var copyText = function (value) {
-      if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(value);
-      var area = document.createElement("textarea");
-      area.value = value;
-      area.style.position = "fixed";
-      area.style.opacity = "0";
-      document.body.appendChild(area);
-      area.select();
-      document.execCommand("copy");
-      area.remove();
-      return Promise.resolve();
-    };
-
-    var importIds = function (value) {
-      try {
-        var parsedUrl = new URL(value, location.href);
-        var raw = new URLSearchParams(parsedUrl.hash.replace(/^#/, "")).get("import");
-        if (!raw && /^\d+(,\d+)*$/.test(value.trim())) raw = value.trim();
-        var seen = {};
-        return (raw || "").split(",").map(Number).filter(function (id) {
-          if (!Number.isInteger(id) || id <= 0 || seen[id]) return false;
-          seen[id] = true;
-          return true;
-        }).slice(0, 50);
-      } catch (error) {
-        return [];
-      }
-    };
-
-    var runImport = function (ids) {
-      if (!ids.length) {
-        showToast("インポートできる推しIDが見つかりませんでした");
-        return Promise.resolve(false);
-      }
-      if (!window.confirm(ids.length + "件の推しを現在のリストへ追加しますか？\n既存の推しは削除されません。")) {
-        return Promise.resolve(false);
-      }
-      return Promise.all(ids.map(function (id) {
-        return fetchOshiSummary({ id: id, name: "推し #" + id }).catch(function () { return null; });
-      })).then(function (summaries) {
-        var list = loadList();
-        var existing = {};
-        list.forEach(function (oshi) { existing[oshi.id] = true; });
-        var added = 0;
-        summaries.filter(Boolean).forEach(function (summary) {
-          if (!existing[summary.id] && list.length < 50) {
-            list.push({ id: summary.id, name: summary.name });
-            existing[summary.id] = true;
-            added++;
-          }
-        });
-        saveList(list);
-        showToast(added ? added + "件をマイ推しリストへ追加しました" : "追加済みの推しです");
-        return true;
-      });
     };
 
     var chooseMonthIndex = function (months) {
@@ -744,8 +687,6 @@
 
     var renderMyPage = function () {
       myCurrentList = loadList();
-      var exportButton = document.getElementById("export-list");
-      exportButton.disabled = !myCurrentList.length;
       if (!myCurrentList.length) {
         myCalendar.hidden = true;
         emptyMyList();
@@ -775,38 +716,7 @@
     document.getElementById("my-calendar-next").addEventListener("click", function () {
       if (myMonthIndex < myMonths.length - 1) { myMonthIndex++; loadMyCalendarMonth(); }
     });
-    document.getElementById("export-list").addEventListener("click", function () {
-      var list = loadList();
-      if (!list.length) return;
-      var shareUrl = location.origin + "/my#import=" + encodeURIComponent(list.map(function (oshi) { return oshi.id; }).join(","));
-      var output = document.getElementById("export-url-output");
-      output.value = shareUrl;
-      document.getElementById("export-url-label").hidden = false;
-      copyText(shareUrl).then(function () { showToast("エクスポートURLをコピーしました"); })
-        .catch(function () {
-          output.focus();
-          output.select();
-          showToast("表示されたURLをコピーしてください");
-        });
-    });
-    document.getElementById("import-list").addEventListener("click", function () {
-      var value = window.prompt("エクスポートURLを貼り付けてください");
-      if (!value) return;
-      runImport(importIds(value)).then(function (changed) { if (changed) renderMyPage(); });
-    });
-    document.getElementById("import-help").addEventListener("click", function (event) {
-      var help = document.getElementById("import-help-text");
-      help.hidden = !help.hidden;
-      event.currentTarget.setAttribute("aria-expanded", help.hidden ? "false" : "true");
-    });
-
-    var hashIds = importIds(location.href);
-    if (location.hash.indexOf("#import=") === 0) {
-      history.replaceState(null, "", location.pathname + location.search);
-      runImport(hashIds).then(function () { renderMyPage(); });
-    } else {
-      renderMyPage();
-    }
+    renderMyPage();
   }
 
   /* --- 共通: ページ遷移、トップへ戻る --- */
