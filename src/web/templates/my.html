@@ -1,23 +1,6 @@
 {% extends "base.html" %}
 {% block title %}マイ推しリスト - {{ site_name }}{% endblock %}
 {% block content %}
-<section class="page-heading-card">
-  <div><p class="eyebrow">MY OSHI LIST</p><h1>マイ推しリスト</h1></div>
-  <div class="my-privacy">
-    <p class="note">このリストはお使いのブラウザにのみ保存されています。サーバーには送信されません。</p>
-    <p class="note">機種変更時はエクスポートをご利用ください。共有URLには推しIDだけを含み、URLフラグメントのためサーバーへ送信されません。</p>
-    <div class="transfer-actions">
-      <button id="export-list" class="secondary-button" type="button">エクスポート</button>
-      <button id="import-list" class="secondary-button" type="button">インポート</button>
-      <button id="import-help" class="text-button" type="button" aria-expanded="false" aria-controls="import-help-text">使い方</button>
-    </div>
-    <label id="export-url-label" class="export-url-label" hidden>エクスポートURL
-      <input id="export-url-output" type="text" readonly>
-    </label>
-    <p id="import-help-text" class="note import-help" hidden>別端末でエクスポートURLを開くと、確認後に現在のリストへ追加されます。既存の推しは削除されません。</p>
-  </div>
-</section>
-
 <section id="my-calendar" class="content-section my-calendar" hidden aria-busy="true">
   <h2 class="section-title">みんなの供給をひとつに</h2>
   <div class="calendar-toolbar my-calendar-toolbar">

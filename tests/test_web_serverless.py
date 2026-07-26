@@ -513,15 +513,12 @@ def test_personalization_hooks_keep_local_storage_private(monkeypatch, tmp_path)
 
     assert 'id="personalized-section"' in top
     assert 'id="my-calendar"' in my_page
-    assert 'id="export-list"' in my_page and 'id="import-list"' in my_page
-    assert 'id="export-url-output"' in my_page
-    assert "このリストはお使いのブラウザにのみ保存されています。サーバーには送信されません。" in my_page
-    assert "URLフラグメント" in my_page
-    assert '"#import="' in script
-    assert '"?import="' not in script  # インポート対象はHTTPリクエストへ載せない
+    assert 'class="page-heading-card"' not in my_page
+    assert 'id="export-list"' not in my_page and 'id="import-list"' not in my_page
+    assert 'id="export-url-output"' not in my_page
+    assert '"#import="' not in script
     assert "text/calendar;charset=utf-8" in script
     assert 'link.hasAttribute("download")' in script
-    assert "navigator.clipboard" in script
 
 
 def test_save_results_persists_availability(monkeypatch, tmp_path):
