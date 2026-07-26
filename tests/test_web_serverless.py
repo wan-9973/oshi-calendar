@@ -235,6 +235,7 @@ def test_soft_clean_ui_keeps_required_footer_on_every_page(monkeypatch, tmp_path
     for path in ("/", f"/oshi/{oshi_id}", "/my"):
         body = client.get(path).text
         assert "運営者:" in body
+        assert "商品リンクには楽天アフィリエイトリンクを使用しています" in body
         assert "商品リンクは楽天アフィリエイトです" in body
         assert 'id="back-to-top"' in body
         assert 'id="page-skeleton"' in body
