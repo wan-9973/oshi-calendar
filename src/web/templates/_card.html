@@ -12,10 +12,11 @@
       {% if c.sales_date %}<p class="date{% if c.is_upcoming %} upcoming{% endif %}"><span class="detail-label">発売日</span><strong>{{ c.sales_date }}</strong>{% if c.is_upcoming %}<span class="upcoming-label">発売前</span>{% endif %}</p>{% endif %}
       {% if c.price is not none %}
         <p class="price">{{ "{:,}".format(c.price) }}円（税込）</p>
+        <p class="fetched">[{{ c.price_fetched_at }}] 時点の価格</p>
       {% else %}
         <p class="price unavailable">最新価格は楽天でご確認ください</p>
+        <p class="fetched">[{{ c.fetched_at }}] 時点の商品情報</p>
       {% endif %}
-      <p class="fetched">[{{ c.fetched_at }}] 時点の情報</p>
     </div>
   </div>
 </a>
