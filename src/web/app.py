@@ -141,13 +141,20 @@ def _activate_profiled_oshi(oshi_id: int) -> None:
 
 
 # --- 表示用ヘルパ -------------------------------------------------------------
+def _fmt_utc(value: dt.datetime | None) -> str:
+    return value.strftime("%Y-%m-%d %H:%M") + " UTC" if value is not None else ""
+
+
 def _card(item: db.Item, price_row: db.PriceCache | None) -> dict:
     """商品カード必須要素（§8.2）: 画像/タイトル/媒体/発売日/価格(24h内)/楽天リンク/取得日時"""
     price = None
-    if price_row is not None:
+    price_fetched_at = None
+    if price_row is not None and price_row.fetched_at is not None:
         age = db.utcnow() - price_row.fetched_at
-        if age <= dt.timedelta(hours=config.PRICE_TTL_HOURS):
+        # 未来日時（クロックスキュー等）も信用しない。0 <= age <= TTL のみ有効。
+        if dt.timedelta(0) <= age <= dt.timedelta(hours=config.PRICE_TTL_HOURS):
             price = price_row.price
+            price_fetched_at = price_row.fetched_at
     card = {
         "title": item.title,
         "media": MEDIA_LABEL.get(item.media, item.media),
@@ -157,9 +164,11 @@ def _card(item: db.Item, price_row: db.PriceCache | None) -> dict:
         "sales_date_iso": item.sales_date_iso,
         "sales_date_precision": item.sales_date_precision,
         "price": price,  # Noneなら「最新価格は楽天でご確認ください」
+        # 価格の取得時刻は価格そのものに紐づける（商品メタの取得時刻とは別物）。
+        "price_fetched_at": _fmt_utc(price_fetched_at),
         "url": item.item_url,   # 楽天ドメインのみ（R6）
         "image": item.image_url,
-        "fetched_at": item.meta_fetched_at.strftime("%Y-%m-%d %H:%M") + " UTC",
+        "fetched_at": _fmt_utc(item.meta_fetched_at),
         "first_seen_at": item.first_seen_at.isoformat() if item.first_seen_at else "",
         "oshi_id": item.oshi_id,
         "is_upcoming": bool(item.sales_date_iso) and

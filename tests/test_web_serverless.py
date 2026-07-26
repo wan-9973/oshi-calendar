@@ -216,7 +216,9 @@ def test_unavailable_items_are_hidden_and_dates_emphasized(monkeypatch, tmp_path
     assert "発売前" in r.text
     assert '<a class="card"' in r.text
     assert 'rel="nofollow sponsored"' in r.text
-    assert "時点の情報" in r.text
+    # 価格キャッシュが無い＝価格非表示。時刻は「商品情報」の取得時刻として表示する。
+    assert "時点の商品情報" in r.text
+    assert "時点の価格" not in r.text
     product_links = re.findall(r'<a class="card"[^>]*href="([^"]+)"', r.text)
     assert product_links
     assert all(url.startswith("https://hb.afl.rakuten.co.jp/") for url in product_links)
@@ -236,6 +238,40 @@ def test_soft_clean_ui_keeps_required_footer_on_every_page(monkeypatch, tmp_path
         assert "商品リンクは楽天アフィリエイトです" in body
         assert 'id="back-to-top"' in body
         assert 'id="page-skeleton"' in body
+
+
+def test_price_timestamp_reflects_price_fetch_time_not_metadata(monkeypatch, tmp_path):
+    """価格の隣に出す取得時刻は価格キャッシュの時刻であること（メタ取得時刻ではない）。"""
+    import datetime as dt
+    client, _ = make_app(monkeypatch, tmp_path)
+    from src import db
+    now = db.utcnow()
+    with db.session() as s:
+        oshi = db.Oshi(name="推しC", aliases_json="[]")
+        s.add(oshi)
+        s.flush()
+        oid = oshi.id
+        common = dict(oshi_id=oid, source_api="books_book", sales_date_precision="day",
+                      sales_date="2026年01月01日", sales_date_iso="2026-01-01",
+                      meta_fetched_at=now - dt.timedelta(days=8))
+        s.add(db.Item(item_code="p_fresh", title="価格が新しい商品",
+                      item_url="https://hb.afl.rakuten.co.jp/e", **common))
+        s.add(db.Item(item_code="p_stale", title="価格が古い商品",
+                      item_url="https://hb.afl.rakuten.co.jp/f", **common))
+        s.add(db.PriceCache(item_code="p_fresh", price=1234,
+                            fetched_at=now - dt.timedelta(hours=2)))
+        s.add(db.PriceCache(item_code="p_stale", price=9999,
+                            fetched_at=now - dt.timedelta(hours=30)))
+        s.commit()
+
+    body = client.get(f"/oshi/{oid}").text
+    fresh_stamp = (now - dt.timedelta(hours=2)).strftime("%Y-%m-%d %H:%M") + " UTC"
+    meta_stamp = (now - dt.timedelta(days=8)).strftime("%Y-%m-%d %H:%M") + " UTC"
+    assert "1,234円（税込）" in body
+    assert f"[{fresh_stamp}] 時点の価格" in body
+    assert "9,999円（税込）" not in body
+    assert f"[{meta_stamp}] 時点の商品情報" in body
+    assert f"[{meta_stamp}] 時点の価格" not in body
 
 
 def test_readability_styles_separate_desktop_and_mobile_layouts():
