@@ -534,12 +534,34 @@
     var directionStartY = lastScrollY;
     var scrollDirection = "";
     var scrollFramePending = false;
+    var scrollToImmediately = function (top) {
+      var root = document.documentElement;
+      var previousScrollBehavior = root.style.scrollBehavior;
+      root.style.scrollBehavior = "auto";
+      window.scrollTo(0, Math.max(0, top));
+      root.style.scrollBehavior = previousScrollBehavior;
+    };
     var setToolbarCompact = function (compact) {
       if (mobileToolbarQuery.matches) compact = false;
+      if (calendarToolbar.classList.contains("is-compact") === compact) return false;
+
+      var headerHeight = parseFloat(getComputedStyle(document.documentElement)
+        .getPropertyValue("--header-height")) || 65;
+      var isSticky = toolbarSentinel && toolbarSentinel.getBoundingClientRect().top <= headerHeight + 1;
+      var scrollYBefore = window.scrollY;
+      var heightBefore = calendarToolbar.getBoundingClientRect().height;
       calendarToolbar.classList.toggle("is-compact", compact);
       if (!compact && filterPanelOpen && !mobileToolbarQuery.matches) {
         setFilterPanelOpen(false, false);
       }
+      if (isSticky) {
+        var heightAfter = calendarToolbar.getBoundingClientRect().height;
+        scrollToImmediately(scrollYBefore + heightAfter - heightBefore);
+      }
+      lastScrollY = window.scrollY;
+      directionStartY = lastScrollY;
+      scrollDirection = compact ? "down" : "up";
+      return true;
     };
     var updateToolbarForScroll = function () {
       scrollFramePending = false;
@@ -568,7 +590,7 @@
           setToolbarCompact(false);
         }
       }
-      lastScrollY = currentY;
+      lastScrollY = Math.max(0, window.scrollY);
     };
     var requestToolbarUpdate = function () {
       if (scrollFramePending) return;
