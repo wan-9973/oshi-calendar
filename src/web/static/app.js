@@ -487,9 +487,124 @@
     renderFavorite();
   }
 
+  var calendarToolbar = document.querySelector("[data-calendar-toolbar]");
+  var toolbarSentinel = document.querySelector("[data-calendar-toolbar-sentinel]");
+  var filterPanel = document.getElementById("calendar-filter-panel");
+  var filterPanelToggle = calendarToolbar && calendarToolbar.querySelector(".filter-panel-toggle");
+  var filterPanelClose = calendarToolbar && calendarToolbar.querySelector(".filter-panel-close");
+  var filterSheetBackdrop = document.querySelector(".filter-sheet-backdrop");
+  var filterSummary = document.getElementById("active-filter-summary");
+  var mobileToolbarQuery = window.matchMedia("(max-width: 600px)");
+  var filterPanelOpen = false;
+
+  var setFilterPanelOpen = function (open, restoreFocus) {
+    if (!calendarToolbar || !filterPanelToggle || !filterPanel) return;
+    filterPanelOpen = open;
+    calendarToolbar.classList.toggle("filter-panel-open", open);
+    filterPanelToggle.setAttribute("aria-expanded", open ? "true" : "false");
+    var mobileOpen = open && mobileToolbarQuery.matches;
+    document.body.classList.toggle("filter-sheet-open", mobileOpen);
+    if (filterSheetBackdrop) filterSheetBackdrop.hidden = !mobileOpen;
+    if (mobileOpen) {
+      filterPanel.setAttribute("role", "dialog");
+      filterPanel.setAttribute("aria-modal", "true");
+      window.setTimeout(function () { if (filterPanelClose) filterPanelClose.focus(); }, 0);
+    } else {
+      filterPanel.removeAttribute("role");
+      filterPanel.removeAttribute("aria-modal");
+      if (!open && restoreFocus) filterPanelToggle.focus();
+    }
+  };
+
+  if (calendarToolbar && filterPanelToggle && filterPanel) {
+    filterPanelToggle.addEventListener("click", function () {
+      setFilterPanelOpen(!filterPanelOpen, false);
+    });
+    if (filterPanelClose) {
+      filterPanelClose.addEventListener("click", function () { setFilterPanelOpen(false, true); });
+    }
+    if (filterSheetBackdrop) {
+      filterSheetBackdrop.addEventListener("click", function () { setFilterPanelOpen(false, true); });
+    }
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && filterPanelOpen) setFilterPanelOpen(false, true);
+    });
+
+    var lastScrollY = window.scrollY;
+    var directionStartY = lastScrollY;
+    var scrollDirection = "";
+    var scrollFramePending = false;
+    var setToolbarCompact = function (compact) {
+      if (mobileToolbarQuery.matches) compact = false;
+      calendarToolbar.classList.toggle("is-compact", compact);
+      if (!compact && filterPanelOpen && !mobileToolbarQuery.matches) {
+        setFilterPanelOpen(false, false);
+      }
+    };
+    var updateToolbarForScroll = function () {
+      scrollFramePending = false;
+      var currentY = Math.max(0, window.scrollY);
+      if (mobileToolbarQuery.matches) {
+        lastScrollY = currentY;
+        directionStartY = currentY;
+        return;
+      }
+      var headerHeight = parseFloat(getComputedStyle(document.documentElement)
+        .getPropertyValue("--header-height")) || 65;
+      var isSticky = toolbarSentinel && toolbarSentinel.getBoundingClientRect().top <= headerHeight + 1;
+      if (!isSticky || currentY <= headerHeight) {
+        scrollDirection = "";
+        directionStartY = currentY;
+        setToolbarCompact(false);
+      } else if (Math.abs(currentY - lastScrollY) >= 2) {
+        var nextDirection = currentY > lastScrollY ? "down" : "up";
+        if (nextDirection !== scrollDirection) {
+          scrollDirection = nextDirection;
+          directionStartY = lastScrollY;
+        }
+        if (nextDirection === "down" && currentY - directionStartY >= 18 && !filterPanelOpen) {
+          setToolbarCompact(true);
+        } else if (nextDirection === "up" && directionStartY - currentY >= 24) {
+          setToolbarCompact(false);
+        }
+      }
+      lastScrollY = currentY;
+    };
+    var requestToolbarUpdate = function () {
+      if (scrollFramePending) return;
+      scrollFramePending = true;
+      window.requestAnimationFrame(updateToolbarForScroll);
+    };
+    var syncToolbarMode = function () {
+      setToolbarCompact(false);
+      setFilterPanelOpen(false, false);
+      lastScrollY = window.scrollY;
+      directionStartY = lastScrollY;
+      scrollDirection = "";
+    };
+    window.addEventListener("scroll", requestToolbarUpdate, { passive: true });
+    if (mobileToolbarQuery.addEventListener) mobileToolbarQuery.addEventListener("change", syncToolbarMode);
+    else mobileToolbarQuery.addListener(syncToolbarMode);
+  }
+
   var timeline = document.getElementById("calendar-timeline");
   var activeMedia = "all";
   var activeRelation = "all";
+  var filterButtonLabel = function (button) {
+    if (!button) return "すべて";
+    return Array.from(button.childNodes).filter(function (node) {
+      return node.nodeType === Node.TEXT_NODE;
+    }).map(function (node) { return node.textContent.trim(); }).filter(Boolean).join(" ") || "すべて";
+  };
+  var updateFilterSummary = function () {
+    if (!filterSummary) return;
+    var mediaLabel = filterButtonLabel(document.querySelector("[data-tab].active"));
+    var relationLabel = filterButtonLabel(document.querySelector("[data-relation-tab].active"));
+    var labels = [];
+    if (activeMedia !== "all") labels.push(mediaLabel);
+    if (activeRelation !== "all") labels.push(relationLabel);
+    filterSummary.textContent = labels.length ? labels.join("・") : "すべて";
+  };
   var applyCalendarFilters = function () {
     if (!timeline) return;
     timeline.querySelectorAll(".card").forEach(function (card) {
@@ -513,6 +628,7 @@
       });
       activeMedia = button.dataset.tab;
       applyCalendarFilters();
+      updateFilterSummary();
     });
   });
   document.querySelectorAll("[data-relation-tab]").forEach(function (button) {
@@ -525,8 +641,10 @@
       });
       activeRelation = button.dataset.relationTab;
       applyCalendarFilters();
+      updateFilterSummary();
     });
   });
+  updateFilterSummary();
 
   /* --- 推しページ: 新着順を24件ずつ追加描画 --- */
   var loadMore = document.getElementById("load-more-items");

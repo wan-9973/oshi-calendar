@@ -353,7 +353,18 @@ def test_oshi_page_corrects_legacy_goods_and_offers_relation_filter(monkeypatch,
     assert 'data-relation-tab="goods"' in page
     assert 'data-calendar-item' in page
     assert 'id="month-calendar-download"' in page
+    assert 'data-calendar-toolbar' in page
+    assert 'data-calendar-toolbar-sentinel' in page
+    assert 'id="calendar-filter-panel"' in page
+    assert 'class="filter-sheet-backdrop"' in page
+    assert 'aria-controls="calendar-filter-panel"' in page
     assert f"<title>分類推しの新刊・新譜・発売予定 |" in page
+
+    script = client.get("/static/app.js").text
+    assert 'nextDirection === "down"' in script
+    assert 'nextDirection === "up"' in script
+    assert 'window.matchMedia("(max-width: 600px)")' in script
+    assert 'setFilterPanelOpen(false, true)' in script
 
 
 def test_search_progress_explains_stages_and_privacy(monkeypatch, tmp_path):
