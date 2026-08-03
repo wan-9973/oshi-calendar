@@ -12,23 +12,39 @@
   {% if showing_history %}
   <p class="calendar-notice" role="status">現在発表されている今後の発売予定はありません。直近の発売実績を表示しています。</p>
   {% endif %}
-  <div class="calendar-toolbar">
-    <nav class="month-nav" aria-label="表示月の変更">
-      {% if prev %}<a class="month-button" href="/oshi/{{ oshi.id }}?y={{ prev.y }}&m={{ prev.m }}" aria-label="前の供給月へ">← <span>前の供給月</span></a>{% else %}<span class="month-button disabled" aria-disabled="true">← <span>前の供給月</span></span>{% endif %}
-      <h2>{{ year }}年{{ month }}月</h2>
-      {% if next %}<a class="month-button" href="/oshi/{{ oshi.id }}?y={{ next.y }}&m={{ next.m }}" aria-label="次の供給月へ"><span>次の供給月</span> →</a>{% else %}<span class="month-button disabled" aria-disabled="true"><span>次の供給月</span> →</span>{% endif %}
-    </nav>
-    <div class="filter-scroller" role="group" aria-label="媒体別フィルタ">
-      <button class="tab active" type="button" data-tab="all" aria-pressed="true">すべて <span class="count-badge">{{ calendar_total }}</span></button>
-      {% for tab in tabs %}<button class="tab" type="button" data-tab="{{ tab.key }}" aria-pressed="false"{% if tab.count == 0 %} disabled aria-disabled="true"{% endif %}>{{ tab.label }} <span class="count-badge">{{ tab.count }}</span></button>{% endfor %}
+  <span class="calendar-toolbar-sentinel" data-calendar-toolbar-sentinel aria-hidden="true"></span>
+  <div class="calendar-toolbar" data-calendar-toolbar>
+    <div class="calendar-toolbar-row">
+      <nav class="month-nav" aria-label="表示月の変更">
+        {% if prev %}<a class="month-button" href="/oshi/{{ oshi.id }}?y={{ prev.y }}&m={{ prev.m }}" aria-label="前の供給月へ">← <span>前の供給月</span></a>{% else %}<span class="month-button disabled" aria-disabled="true">← <span>前の供給月</span></span>{% endif %}
+        <h2>{{ year }}年{{ month }}月</h2>
+        {% if next %}<a class="month-button" href="/oshi/{{ oshi.id }}?y={{ next.y }}&m={{ next.m }}" aria-label="次の供給月へ"><span>次の供給月</span> →</a>{% else %}<span class="month-button disabled" aria-disabled="true"><span>次の供給月</span> →</span>{% endif %}
+      </nav>
+      <span id="active-filter-summary" class="active-filter-summary" aria-live="polite">すべて</span>
+      <button class="filter-panel-toggle" type="button" aria-expanded="false" aria-controls="calendar-filter-panel">
+        <span aria-hidden="true">☰</span> 絞り込み
+      </button>
     </div>
-    <div class="filter-scroller relation-scroller" role="group" aria-label="関係性フィルタ">
-      <span class="filter-label">関係性</span>
-      <button class="relation-tab active" type="button" data-relation-tab="all" aria-pressed="true">すべて <span class="count-badge">{{ calendar_total }}</span></button>
-      {% for tab in relation_tabs %}<button class="relation-tab" type="button" data-relation-tab="{{ tab.key }}" aria-pressed="false"{% if tab.count == 0 %} disabled aria-disabled="true"{% endif %}>{{ tab.label }} <span class="count-badge">{{ tab.count }}</span></button>{% endfor %}
+    <div id="calendar-filter-panel" class="calendar-filter-panel" aria-label="商品の絞り込み">
+      <div class="filter-sheet-header">
+        <span class="filter-sheet-handle" aria-hidden="true"></span>
+        <h2>商品の絞り込み</h2>
+        <button class="filter-panel-close" type="button" aria-label="絞り込みを閉じる">×</button>
+      </div>
+      <div class="filter-scroller" role="group" aria-label="媒体別フィルタ">
+        <span class="filter-label">分類</span>
+        <button class="tab active" type="button" data-tab="all" aria-pressed="true">すべて <span class="count-badge">{{ calendar_total }}</span></button>
+        {% for tab in tabs %}<button class="tab" type="button" data-tab="{{ tab.key }}" aria-pressed="false"{% if tab.count == 0 %} disabled aria-disabled="true"{% endif %}>{{ tab.label }} <span class="count-badge">{{ tab.count }}</span></button>{% endfor %}
+      </div>
+      <div class="filter-scroller relation-scroller" role="group" aria-label="関係性フィルタ">
+        <span class="filter-label">関係性</span>
+        <button class="relation-tab active" type="button" data-relation-tab="all" aria-pressed="true">すべて <span class="count-badge">{{ calendar_total }}</span></button>
+        {% for tab in relation_tabs %}<button class="relation-tab" type="button" data-relation-tab="{{ tab.key }}" aria-pressed="false"{% if tab.count == 0 %} disabled aria-disabled="true"{% endif %}>{{ tab.label }} <span class="count-badge">{{ tab.count }}</span></button>{% endfor %}
+      </div>
+      {% if calendar_total %}<button id="month-calendar-download" class="calendar-add-button calendar-download-button" type="button" data-oshi-id="{{ oshi.id }}" data-oshi-name="{{ oshi.name }}" data-year="{{ year }}" data-month="{{ month }}">📅 この月をまとめて追加</button>{% endif %}
     </div>
-    {% if calendar_total %}<button id="month-calendar-download" class="calendar-add-button calendar-download-button" type="button" data-oshi-id="{{ oshi.id }}" data-oshi-name="{{ oshi.name }}" data-year="{{ year }}" data-month="{{ month }}">📅 この月をまとめて追加</button>{% endif %}
   </div>
+  <button class="filter-sheet-backdrop" type="button" aria-label="絞り込みを閉じる" hidden></button>
   {% if calendar_days %}
     <div class="timeline" id="calendar-timeline">
     {% for date in calendar_days %}
