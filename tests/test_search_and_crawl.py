@@ -49,6 +49,20 @@ def test_search_all_normalizes_and_merges(test_db):
     assert result["failed_apis"] == []
 
 
+def test_books_game_character_merchandise_is_classified_as_goods(test_db):
+    merch = {
+        "title": "テスト作家 アクリルキーホルダー",
+        "jan": "4570000000001",
+        "salesDate": "2026年08月20日",
+        "itemUrl": "https://books.rakuten.co.jp/merch",
+        "affiliateUrl": "https://hb.afl.rakuten.co.jp/hgc/merch",
+        "availability": 5,
+    }
+    result = search_all("テスト作家", client=fake_client({"books_game": [merch]}))
+    assert len(result["records"]) == 1
+    assert result["records"][0]["media"] == "goods"
+
+
 def test_partial_failure_is_normal(test_db):
     client = fake_client({"books_book": [BOOK]})
     client.search.side_effect = lambda api, p: (

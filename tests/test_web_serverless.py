@@ -239,6 +239,8 @@ def test_soft_clean_ui_keeps_required_footer_on_every_page(monkeypatch, tmp_path
         assert "商品リンクは楽天アフィリエイトです" in body
         assert 'id="back-to-top"' in body
         assert 'id="page-skeleton"' in body
+        assert '<meta name="description"' in body
+        assert '<meta property="og:title"' in body
 
 
 def test_price_timestamp_reflects_price_fetch_time_not_metadata(monkeypatch, tmp_path):
@@ -286,6 +288,90 @@ def test_readability_styles_separate_desktop_and_mobile_layouts():
     assert "grid-template-columns: repeat(4, minmax(0, 1fr))" in css
     assert "grid-template-columns: 112px minmax(0, 1fr)" in css
     assert "font-size: 0.94rem" in css
+
+
+def test_top_groups_results_shows_oshi_and_calendar_actions(monkeypatch, tmp_path):
+    import datetime as dt
+    client, _ = make_app(monkeypatch, tmp_path)
+    from src import db
+    today = dt.date.today()
+    with db.session() as s:
+        oshi = db.Oshi(name="トップ推し", aliases_json="[]")
+        s.add(oshi)
+        s.flush()
+        for index in range(14):
+            s.add(db.Item(
+                oshi_id=oshi.id, source_api="books_cd", media="cd",
+                item_code=f"top-{index:02d}", title=f"トップ商品タイトル {index:02d}",
+                author_or_artist="トップ推し", relevance=1.0,
+                sales_date=f"{today.year}年{today.month:02d}月{today.day:02d}日",
+                sales_date_iso=today.isoformat(), sales_date_precision="day",
+                item_url=f"https://hb.afl.rakuten.co.jp/top-{index}", availability=5,
+            ))
+        s.commit()
+
+    page = client.get("/").text
+    assert 'class="badge oshi-chip">トップ推し</span>' in page
+    assert 'class="badge relation relation-direct">本人名義</span>' in page
+    assert 'data-oshi-name="トップ推し"' in page
+    assert 'data-calendar-item' in page
+    assert "さらに2件を見る" in page
+
+
+def test_oshi_page_corrects_legacy_goods_and_offers_relation_filter(monkeypatch, tmp_path):
+    import datetime as dt
+    client, _ = make_app(monkeypatch, tmp_path)
+    from src import db
+    release = dt.date.today() + dt.timedelta(days=10)
+    with db.session() as s:
+        oshi = db.Oshi(name="分類推し", aliases_json="[]")
+        s.add(oshi)
+        s.flush()
+        s.add(db.Item(
+            oshi_id=oshi.id, source_api="books_game", media="game",
+            item_code="legacy-goods", title="分類推し アクリルキーホルダー",
+            author_or_artist="メーカー", relevance=0.7,
+            sales_date=f"{release.year}年{release.month:02d}月{release.day:02d}日",
+            sales_date_iso=release.isoformat(), sales_date_precision="day",
+            item_url="https://hb.afl.rakuten.co.jp/legacy-goods", availability=5,
+        ))
+        s.commit()
+        oshi_id = oshi.id
+
+    page = client.get(f"/oshi/{oshi_id}").text
+    assert 'data-media="goods" data-relation="goods"' in page
+    assert 'class="badge relation relation-goods">グッズ関連</span>' in page
+    assert 'data-relation-tab="goods"' in page
+    assert 'data-calendar-item' in page
+    assert 'id="month-calendar-download"' in page
+    assert f"<title>分類推しの新刊・新譜・発売予定 |" in page
+
+
+def test_search_progress_explains_stages_and_privacy(monkeypatch, tmp_path):
+    client, _ = make_app(monkeypatch, tmp_path)
+    page = client.get("/").text
+    script = client.get("/static/app.js").text
+    assert "無料" in page and "ログイン不要" in page
+    assert "登録情報はこの端末だけ" not in page
+    assert 'id="search-detail"' in page
+    assert "取得できた媒体から結果を整理しています" in script
+
+
+def test_robots_and_sitemap_expose_public_pages_only(monkeypatch, tmp_path):
+    client, _ = make_app(monkeypatch, tmp_path)
+    from src import db
+    with db.session() as s:
+        visible = db.Oshi(name="公開推し", hidden=0)
+        hidden = db.Oshi(name="非公開推し", hidden=1)
+        s.add_all([visible, hidden])
+        s.commit()
+        visible_id, hidden_id = visible.id, hidden.id
+
+    robots = client.get("/robots.txt").text
+    sitemap = client.get("/sitemap.xml").text
+    assert "Disallow: /api/" in robots and "Disallow: /my" in robots
+    assert f"/oshi/{visible_id}" in sitemap
+    assert f"/oshi/{hidden_id}" not in sitemap
 
 
 def test_empty_month_links_to_next_release_and_counts_media(monkeypatch, tmp_path):
@@ -513,6 +599,7 @@ def test_personalization_hooks_keep_local_storage_private(monkeypatch, tmp_path)
 
     assert 'id="personalized-section"' in top
     assert 'id="my-calendar"' in my_page
+    assert 'id="my-calendar-download"' in my_page
     assert 'class="page-heading-card"' not in my_page
     assert 'id="export-list"' not in my_page and 'id="import-list"' not in my_page
     assert 'id="export-url-output"' not in my_page

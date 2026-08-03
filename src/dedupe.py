@@ -7,6 +7,21 @@ import unicodedata
 from . import config
 
 
+_GOODS_TITLE_MARKERS = (
+    "アクリル", "キーホルダー", "キーチェーン", "缶バッジ", "ステッカー",
+    "クリアファイル", "ポスター", "ジグソーパズル", "ぬいぐるみ",
+    "フィギュア", "チャーム", "タオル", "クッション", "マグカップ",
+    "トートバッグ", "ショッピングバッグ", "Tシャツ", "ホルダー",
+)
+
+
+def classify_media(media: str, title: str) -> str:
+    """楽天BooksGameに混在する非ゲームのキャラクターグッズを表示上補正する。"""
+    if media == "game" and any(marker in (title or "") for marker in _GOODS_TITLE_MARKERS):
+        return "goods"
+    return media
+
+
 def normalize(text: str) -> str:
     """照合用正規化: NFKC → 小文字 → 空白・中点類を除去。"""
     if not text:

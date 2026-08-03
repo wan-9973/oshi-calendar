@@ -15,10 +15,11 @@ import time
 import uuid
 from collections import defaultdict, deque
 from pathlib import Path
+from xml.sax.saxutils import escape
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from sqlalchemy import and_, not_, or_, true
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -26,6 +27,7 @@ from .. import config, db
 from ..entity_profiles import profile_for
 from ..calendar_service import month_calendar
 from ..crawler import run_once as crawl_run_once
+from ..dedupe import classify_media
 from ..monitoring import health_snapshot, run_job
 from ..retention import run_once as retention_run_once
 from ..search_service import find_or_create_oshi, save_results, search_all
@@ -48,6 +50,8 @@ MEDIA_TABS = [("book", "書籍"), ("cd", "CD"), ("dvd", "映像"), ("magazine", 
               ("game", "ゲーム"), ("ebook", "電子"), ("goods", "グッズ"), ("mixed", "その他")]
 MEDIA_LABEL = dict(MEDIA_TABS)
 WEEKDAY_LABELS = ("月", "火", "水", "木", "金", "土", "日")
+TOP_VISIBLE_GROUPS = 12
+_DIRECT_SOURCES = {"books_book", "books_cd", "books_dvd", "kobo"}
 
 _VARIATION_MARKERS = (
     "限定", "特典", "初回", "通常", "盤", "版", "セット", "楽天", "先着", "仕様", "ジャケット",
@@ -155,10 +159,19 @@ def _card(item: db.Item, price_row: db.PriceCache | None) -> dict:
         if dt.timedelta(0) <= age <= dt.timedelta(hours=config.PRICE_TTL_HOURS):
             price = price_row.price
             price_fetched_at = price_row.fetched_at
+    media_key = classify_media(item.media, item.title)
+    if media_key == "goods":
+        relation_key, relation = "goods", "グッズ関連"
+    elif item.source_api in _DIRECT_SOURCES and (item.relevance or 0) >= config.SCORE_FIELD_MATCH:
+        relation_key, relation = "direct", "本人名義"
+    else:
+        relation_key, relation = "related", "出演・関連"
     card = {
         "title": item.title,
-        "media": MEDIA_LABEL.get(item.media, item.media),
-        "media_key": item.media,
+        "media": MEDIA_LABEL.get(media_key, media_key),
+        "media_key": media_key,
+        "relation": relation,
+        "relation_key": relation_key,
         "author": item.author_or_artist,
         "sales_date": item.sales_date,
         "sales_date_iso": item.sales_date_iso,
@@ -203,6 +216,18 @@ def _cards_for(s, items: list[db.Item], oshi: db.Oshi | None = None) -> list[dic
         for card in cards:
             card["author"] = _display_author(card["author"], oshi.name, aliases)
             card["oshi_name"] = oshi.name
+    else:
+        oshi_ids = {item.oshi_id for item in items}
+        oshis = {row.id: row for row in s.query(db.Oshi).filter(db.Oshi.id.in_(oshi_ids)).all()} \
+            if oshi_ids else {}
+        for item, card in zip(items, cards):
+            owner = oshis.get(item.oshi_id)
+            if owner is None:
+                continue
+            profile = profile_for(owner.name)
+            aliases = [*owner.aliases, *((profile or {}).get("aliases") or [])]
+            card["author"] = _display_author(card["author"], owner.name, aliases)
+            card["oshi_name"] = owner.name
     return cards
 
 
@@ -237,6 +262,12 @@ def _group_variations(cards: list[dict]) -> list[dict]:
         else:
             group["variations"].append(card)
     return groups
+
+
+def _top_groups(cards: list[dict]) -> tuple[list[dict], list[dict]]:
+    """トップは最初の12商品群だけ見せ、残りは利用者が必要なときだけ展開する。"""
+    groups = _group_variations(cards)
+    return groups[:TOP_VISIBLE_GROUPS], groups[TOP_VISIBLE_GROUPS:]
 
 
 def _month_key(value: str) -> str | None:
@@ -342,9 +373,13 @@ def top(request: Request):
             .filter(db.Item.sales_date_iso >= today, db.Item.sales_date_iso <= horizon,
                     db.Oshi.hidden == 0, _visible()) \
             .order_by(db.Item.sales_date_iso.asc()).limit(60).all()
+        new_groups, new_more_groups = _top_groups(_cards_for(s, new_rows))
+        upcoming_groups, upcoming_more_groups = _top_groups(_cards_for(s, up_rows))
         return templates.TemplateResponse(request, "index.html", {
-            "new_items": _cards_for(s, new_rows),
-            "upcoming": _cards_for(s, up_rows),
+            "new_groups": new_groups,
+            "new_more_groups": new_more_groups,
+            "upcoming_groups": upcoming_groups,
+            "upcoming_more_groups": upcoming_more_groups,
         })
 
 
@@ -381,6 +416,11 @@ def oshi_page(request: Request, oshi_id: int, y: int | None = None, m: int | Non
             key: sum(1 for card in month_cards if card["media_key"] == key)
             for key, _ in MEDIA_TABS
         }
+        relation_tabs = [
+            {"key": key, "label": label,
+             "count": sum(1 for card in month_cards if card["relation_key"] == key)}
+            for key, label in (("direct", "本人名義"), ("related", "出演・関連"), ("goods", "グッズ"))
+        ]
 
         newest_query = s.query(db.Item).filter(db.Item.oshi_id == oshi_id, _visible())
         newest_total = newest_query.count()
@@ -402,6 +442,7 @@ def oshi_page(request: Request, oshi_id: int, y: int | None = None, m: int | Non
                 {"key": key, "label": label, "count": tab_counts[key]}
                 for key, label in MEDIA_TABS
             ],
+            "relation_tabs": relation_tabs,
             "calendar": cal,
             "calendar_days": _calendar_days(cal, y, m),
             "calendar_total": len(month_cards),
@@ -419,6 +460,24 @@ def oshi_page(request: Request, oshi_id: int, y: int | None = None, m: int | Non
 def my_page(request: Request):
     """URLを知っていれば誰でも開ける公開ページ。中身はブラウザのlocalStorage依存（R8）。"""
     return templates.TemplateResponse(request, "my.html", {})
+
+
+@app.get("/robots.txt", response_class=PlainTextResponse)
+def robots(request: Request):
+    base = str(request.base_url).rstrip("/")
+    return f"User-agent: *\nDisallow: /api/\nDisallow: /my\nSitemap: {base}/sitemap.xml\n"
+
+
+@app.get("/sitemap.xml")
+def sitemap(request: Request):
+    base = str(request.base_url).rstrip("/")
+    with db.session() as s:
+        oshi_ids = [row.id for row in s.query(db.Oshi.id).filter(db.Oshi.hidden == 0).all()]
+    urls = [f"{base}/", *(f"{base}/oshi/{oshi_id}" for oshi_id in oshi_ids)]
+    body = '<?xml version="1.0" encoding="UTF-8"?>\n' \
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + \
+        "".join(f"  <url><loc>{escape(url)}</loc></url>\n" for url in urls) + "</urlset>\n"
+    return Response(body, media_type="application/xml")
 
 
 # --- API ----------------------------------------------------------------------

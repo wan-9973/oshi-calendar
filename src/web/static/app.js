@@ -89,28 +89,49 @@
       date.getDate().toString().padStart(2, "0");
   }
 
-  function downloadIcs(card, oshiName) {
-    var release = (card.sales_date_iso || "").replace(/-/g, "");
-    if (!/^\d{8}$/.test(release)) return;
+  function downloadIcsCards(cards, label) {
+    var exactCards = cards.filter(function (card) {
+      return card.sales_date_precision === "day" && parseIsoDate(card.sales_date_iso);
+    });
+    if (!exactCards.length) {
+      showToast("日付が確定した発売予定はありません");
+      return;
+    }
     var stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
-    var uid = "oshi-" + (card.oshi_id || "item") + "-" + release + "-" + Date.now() + "@oshi-calendar";
     var lines = [
-      "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Oshi Calendar//JP", "CALSCALE:GREGORIAN",
-      "BEGIN:VEVENT", "UID:" + uid, "DTSTAMP:" + stamp, "DTSTART;VALUE=DATE:" + release,
-      "DTEND;VALUE=DATE:" + addOneDay(card.sales_date_iso),
-      "SUMMARY:" + escapeIcs("【" + oshiName + "】" + card.title + " 発売日"),
-      "DESCRIPTION:" + escapeIcs(card.url), "URL:" + card.url, "END:VEVENT", "END:VCALENDAR"
+      "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Oshi Calendar//JP", "CALSCALE:GREGORIAN"
     ];
+    exactCards.forEach(function (card, index) {
+      var release = card.sales_date_iso.replace(/-/g, "");
+      var oshiName = card.oshi_name || label || "推し";
+      lines.push(
+        "BEGIN:VEVENT",
+        "UID:oshi-" + (card.oshi_id || "item") + "-" + release + "-" + index + "@oshi-calendar",
+        "DTSTAMP:" + stamp,
+        "DTSTART;VALUE=DATE:" + release,
+        "DTEND;VALUE=DATE:" + addOneDay(card.sales_date_iso),
+        "SUMMARY:" + escapeIcs("【" + oshiName + "】" + card.title + " 発売日"),
+        "DESCRIPTION:" + escapeIcs(card.url),
+        "URL:" + card.url,
+        "END:VEVENT"
+      );
+    });
+    lines.push("END:VCALENDAR");
     var blob = new Blob([lines.join("\r\n") + "\r\n"], { type: "text/calendar;charset=utf-8" });
     var url = URL.createObjectURL(blob);
     var link = document.createElement("a");
     link.href = url;
-    link.download = "oshi-calendar-" + release + ".ics";
+    link.download = "oshi-calendar-" + String(label || "schedule").replace(/[^0-9A-Za-z_-]/g, "-") + ".ics";
     document.body.appendChild(link);
     link.click();
     link.remove();
     setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
-    showToast("カレンダーファイルを作成しました");
+    showToast(exactCards.length + "件のカレンダーファイルを作成しました");
+  }
+
+  function downloadIcs(card, oshiName) {
+    downloadIcsCards([Object.assign({}, card, { oshi_name: card.oshi_name || oshiName })],
+      card.sales_date_iso || "item");
   }
 
   function fetchOshiSummary(oshi) {
@@ -151,6 +172,7 @@
     var link = document.createElement("a");
     link.className = "card";
     link.dataset.media = card.media_key || "";
+    link.dataset.relation = card.relation_key || "related";
     if (card.oshi_id) link.dataset.oshiId = String(card.oshi_id);
     link.href = card.url;
     link.rel = "nofollow sponsored";
@@ -184,6 +206,8 @@
     var badges = document.createElement("div");
     badges.className = "badge-row";
     appendTextElement(badges, "span", "badge", card.media || card.media_key || "その他");
+    appendTextElement(badges, "span", "badge relation relation-" + (card.relation_key || "related"),
+      card.relation || "出演・関連");
     if (card.is_new) appendTextElement(badges, "span", "badge new", "NEW");
     if (options.showOshi && card.oshi_name) {
       appendTextElement(badges, "span", "badge oshi-chip", card.oshi_name);
@@ -215,7 +239,7 @@
     body.appendChild(details);
     link.appendChild(body);
     shell.appendChild(link);
-    if (options.ics && parseIsoDate(card.sales_date_iso)) {
+    if (options.ics && card.sales_date_precision === "day" && parseIsoDate(card.sales_date_iso)) {
       var calendarButton = document.createElement("button");
       calendarButton.className = "calendar-add-button";
       calendarButton.type = "button";
@@ -227,6 +251,33 @@
       shell.appendChild(calendarButton);
     }
     return shell;
+  }
+
+  document.querySelectorAll("[data-calendar-item]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      downloadIcs({
+        title: button.dataset.title,
+        sales_date_iso: button.dataset.salesDate,
+        sales_date_precision: "day",
+        oshi_id: button.dataset.oshiId,
+        url: button.dataset.itemUrl
+      }, button.dataset.oshiName || "推し");
+    });
+  });
+
+  var monthCalendarDownload = document.getElementById("month-calendar-download");
+  if (monthCalendarDownload) {
+    monthCalendarDownload.addEventListener("click", function () {
+      monthCalendarDownload.disabled = true;
+      fetch("/api/oshi/" + monthCalendarDownload.dataset.oshiId + "/calendar?y=" +
+        monthCalendarDownload.dataset.year + "&m=" + monthCalendarDownload.dataset.month + "&limit=60")
+        .then(function (response) { if (!response.ok) throw new Error(); return response.json(); })
+        .then(function (data) {
+          downloadIcsCards(data.items || [], monthCalendarDownload.dataset.year + "-" + monthCalendarDownload.dataset.month);
+        })
+        .catch(function () { showToast("カレンダーを作成できませんでした"); })
+        .finally(function () { monthCalendarDownload.disabled = false; });
+    });
   }
 
   function createVariationGroup(group, options) {
@@ -270,6 +321,7 @@
       var progress = document.getElementById("search-progress");
       var bar = document.getElementById("search-bar");
       var msg = document.getElementById("search-message");
+      var detail = document.getElementById("search-detail");
       var err = document.getElementById("search-error");
       err.hidden = true;
       progress.hidden = false;
@@ -285,6 +337,7 @@
           sim++;
           bar.value = sim;
           msg.textContent = stages[sim];
+          if (detail) detail.textContent = (sim + 1) + " / " + stages.length + " 段階。取得できた媒体から結果を整理しています。";
         }
       }, 1300);
 
@@ -398,7 +451,7 @@
           note.textContent = "登録中の推しの供給情報はまだありません。";
         } else {
           unique.forEach(function (card) {
-            grid.appendChild(createProductCard(card, { showOshi: true, myOshi: true }));
+            grid.appendChild(createProductCard(card, { showOshi: true, myOshi: true, ics: true }));
           });
         }
         personalizedSection.setAttribute("aria-busy", "false");
@@ -435,25 +488,43 @@
   }
 
   var timeline = document.getElementById("calendar-timeline");
-  document.querySelectorAll(".tab").forEach(function (button) {
+  var activeMedia = "all";
+  var activeRelation = "all";
+  var applyCalendarFilters = function () {
+    if (!timeline) return;
+    timeline.querySelectorAll(".card").forEach(function (card) {
+      card.hidden = (activeMedia !== "all" && card.dataset.media !== activeMedia) ||
+        (activeRelation !== "all" && card.dataset.relation !== activeRelation);
+    });
+    timeline.querySelectorAll("[data-variation-group]").forEach(function (group) {
+      group.hidden = !group.querySelector(".card:not([hidden])");
+    });
+    timeline.querySelectorAll("[data-date-group]").forEach(function (dateGroup) {
+      dateGroup.hidden = !dateGroup.querySelector("[data-variation-group]:not([hidden])");
+    });
+  };
+  document.querySelectorAll("[data-tab]").forEach(function (button) {
     button.addEventListener("click", function () {
       if (button.disabled) return;
-      document.querySelectorAll(".tab").forEach(function (other) {
+      document.querySelectorAll("[data-tab]").forEach(function (other) {
         var active = other === button;
         other.classList.toggle("active", active);
         other.setAttribute("aria-pressed", active ? "true" : "false");
       });
-      if (!timeline) return;
-      var tab = button.dataset.tab;
-      timeline.querySelectorAll(".card").forEach(function (card) {
-        card.hidden = tab !== "all" && card.dataset.media !== tab;
+      activeMedia = button.dataset.tab;
+      applyCalendarFilters();
+    });
+  });
+  document.querySelectorAll("[data-relation-tab]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      if (button.disabled) return;
+      document.querySelectorAll("[data-relation-tab]").forEach(function (other) {
+        var active = other === button;
+        other.classList.toggle("active", active);
+        other.setAttribute("aria-pressed", active ? "true" : "false");
       });
-      timeline.querySelectorAll("[data-variation-group]").forEach(function (group) {
-        group.hidden = !group.querySelector(".card:not([hidden])");
-      });
-      timeline.querySelectorAll("[data-date-group]").forEach(function (dateGroup) {
-        dateGroup.hidden = !dateGroup.querySelector("[data-variation-group]:not([hidden])");
-      });
+      activeRelation = button.dataset.relationTab;
+      applyCalendarFilters();
     });
   });
 
@@ -474,7 +545,7 @@
           return response.json();
         })
         .then(function (data) {
-          data.groups.forEach(function (group) { grid.appendChild(createVariationGroup(group)); });
+          data.groups.forEach(function (group) { grid.appendChild(createVariationGroup(group, { ics: true })); });
           loadMore.dataset.offset = String(data.next_offset);
           var remaining = Math.max(0, total - data.next_offset);
           status.textContent = data.items.length + "件を追加しました。";
@@ -500,6 +571,8 @@
     var myCalendar = document.getElementById("my-calendar");
     var myTimeline = document.getElementById("my-calendar-timeline");
     var myCalendarNote = document.getElementById("my-calendar-note");
+    var myCalendarDownload = document.getElementById("my-calendar-download");
+    var myVisibleCards = [];
     var mySummaryCache = {};
     var myCalendarCache = {};
     var myCurrentList = [];
@@ -508,7 +581,8 @@
 
     var emptyMyList = function () {
       myList.innerHTML = '<div class="empty-state"><span class="empty-illustration" aria-hidden="true">💗</span>' +
-        '<h2>まだ推しが登録されていません</h2><p>推しページの「☆ マイ推しリストに追加」から登録できます。</p>' +
+        '<h2>まだ推しが登録されていません</h2><p>登録すると、複数の推しの次の発売をここだけで確認できます。</p>' +
+        '<p class="note">登録情報はこの端末だけに保存され、サーバーには送信されません。</p>' +
         '<a class="primary-link" href="/">推しを検索する</a></div>';
     };
 
@@ -531,6 +605,8 @@
     };
 
     var renderCombinedTimeline = function (cards) {
+      myVisibleCards = cards.slice();
+      myCalendarDownload.hidden = !cards.some(function (card) { return card.sales_date_precision === "day"; });
       myTimeline.innerHTML = "";
       if (!cards.length) {
         var empty = document.createElement("div");
@@ -618,6 +694,10 @@
         myCalendar.setAttribute("aria-busy", "false");
       });
     };
+
+    myCalendarDownload.addEventListener("click", function () {
+      downloadIcsCards(myVisibleCards, myMonths[myMonthIndex] || "my-oshi");
+    });
 
     var renderOshiSections = function () {
       myList.innerHTML = "";

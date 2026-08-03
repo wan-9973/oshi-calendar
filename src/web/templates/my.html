@@ -1,5 +1,6 @@
 {% extends "base.html" %}
-{% block title %}マイ推しリスト - {{ site_name }}{% endblock %}
+{% block title %}マイ推しリスト | {{ site_name }}{% endblock %}
+{% block description %}登録した推しの発売予定を、端末内だけに保存してまとめて確認できます。{% endblock %}
 {% block content %}
 <section id="my-calendar" class="content-section my-calendar" hidden aria-busy="true">
   <h2 class="section-title">みんなの供給をひとつに</h2>
@@ -14,11 +15,12 @@
     {% for _ in range(4) %}<div class="skeleton-card"><div class="skeleton-image"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>{% endfor %}
   </div>
   <p id="my-calendar-note" class="note" role="status" aria-live="polite"></p>
+  <button id="my-calendar-download" class="calendar-add-button calendar-download-button" type="button" hidden>📅 表示中の月をまとめて追加</button>
   <div id="my-calendar-timeline" class="timeline"></div>
 </section>
 
 <section class="content-section">
   <h2 class="section-title">登録中の推し</h2>
-  <div id="my-list" class="my-list"><div class="empty-state"><span class="empty-illustration" aria-hidden="true">💗</span><h2>まだ推しが登録されていません</h2><p>推しページの「☆ マイ推しリストに追加」から登録できます。</p><a class="primary-link" href="/">推しを検索する</a></div></div>
+  <div id="my-list" class="my-list"><div class="empty-state"><span class="empty-illustration" aria-hidden="true">💗</span><h2>まだ推しが登録されていません</h2><p>登録すると、複数の推しの次の発売をここだけで確認できます。</p><p class="note">登録情報はこの端末だけに保存され、サーバーには送信されません。</p><a class="primary-link" href="/">推しを検索する</a></div></div>
 </section>
 {% endblock %}

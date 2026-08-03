@@ -11,7 +11,7 @@ from typing import Any, Callable, Optional
 
 from . import config, db
 from .calendar_service import parse_sales_date
-from .dedupe import merge
+from .dedupe import classify_media, merge
 from .rakuten_client import RakutenClient
 
 logger = logging.getLogger(__name__)
@@ -64,7 +64,7 @@ def _normalize(api: str, media: str, item: dict, trusted: bool) -> Optional[dict
     availability = _to_int(item.get("availability"))
     return {
         "source_api": api,
-        "media": media,
+        "media": classify_media(media, str(title)),
         "item_code": str(_first(item, "isbn", "jan", "itemCode", "itemNumber")),
         "title": str(title),
         "author_or_artist": str(_first(item, "author", "artistName", "label", "publisherName", "shopName")),

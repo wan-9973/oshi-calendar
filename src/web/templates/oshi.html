@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% from "_card.html" import card %}
-{% block title %}{{ oshi.name }} - {{ site_name }}{% endblock %}
+{% block title %}{{ oshi.name }}の新刊・新譜・発売予定 | {{ site_name }}{% endblock %}
+{% block description %}{{ oshi.name }}の新刊・新譜・出演作品・関連グッズの発売予定をまとめて確認できます。無料・ログイン不要です。{% endblock %}
 {% block content %}
 <section class="oshi-hero">
   <div><p class="eyebrow">OSHI SUPPLY CALENDAR</p><h1>{{ oshi.name }} の供給カレンダー</h1></div>
@@ -21,6 +22,12 @@
       <button class="tab active" type="button" data-tab="all" aria-pressed="true">すべて <span class="count-badge">{{ calendar_total }}</span></button>
       {% for tab in tabs %}<button class="tab" type="button" data-tab="{{ tab.key }}" aria-pressed="false"{% if tab.count == 0 %} disabled aria-disabled="true"{% endif %}>{{ tab.label }} <span class="count-badge">{{ tab.count }}</span></button>{% endfor %}
     </div>
+    <div class="filter-scroller relation-scroller" role="group" aria-label="関係性フィルタ">
+      <span class="filter-label">関係性</span>
+      <button class="relation-tab active" type="button" data-relation-tab="all" aria-pressed="true">すべて <span class="count-badge">{{ calendar_total }}</span></button>
+      {% for tab in relation_tabs %}<button class="relation-tab" type="button" data-relation-tab="{{ tab.key }}" aria-pressed="false"{% if tab.count == 0 %} disabled aria-disabled="true"{% endif %}>{{ tab.label }} <span class="count-badge">{{ tab.count }}</span></button>{% endfor %}
+    </div>
+    {% if calendar_total %}<button id="month-calendar-download" class="calendar-add-button calendar-download-button" type="button" data-oshi-id="{{ oshi.id }}" data-oshi-name="{{ oshi.name }}" data-year="{{ year }}" data-month="{{ month }}">📅 この月をまとめて追加</button>{% endif %}
   </div>
   {% if calendar_days %}
     <div class="timeline" id="calendar-timeline">
@@ -30,11 +37,11 @@
         <div class="timeline-grid">
           {% for group in date.groups %}
           <div class="variation-group" data-variation-group>
-            {{ card(group.representative) }}
+            {{ card(group.representative, show_calendar=true) }}
             {% if group.variations %}
             <details class="variations">
               <summary>他{{ group.variations | length }}件のバリエーションを見る</summary>
-              <div class="grid variation-grid">{% for c in group.variations %}{{ card(c) }}{% endfor %}</div>
+              <div class="grid variation-grid">{% for c in group.variations %}{{ card(c, show_calendar=true) }}{% endfor %}</div>
             </details>
             {% endif %}
           </div>
@@ -61,11 +68,11 @@
   <div class="grid" id="newest-grid">
     {% for group in newest_groups %}
     <div class="variation-group" data-variation-group>
-      {{ card(group.representative) }}
+      {{ card(group.representative, show_calendar=true) }}
       {% if group.variations %}
       <details class="variations">
         <summary>他{{ group.variations | length }}件のバリエーションを見る</summary>
-        <div class="grid variation-grid">{% for c in group.variations %}{{ card(c) }}{% endfor %}</div>
+        <div class="grid variation-grid">{% for c in group.variations %}{{ card(c, show_calendar=true) }}{% endfor %}</div>
       </details>
       {% endif %}
     </div>
