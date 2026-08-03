@@ -1,8 +1,17 @@
 """サーバーレスモード（同期検索・cron保護）のテスト。"""
 import importlib
+import json
 import re
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+
+
+def test_vercel_uses_native_fastapi_routing():
+    config_path = Path(__file__).parents[1] / "vercel.json"
+    vercel_config = json.loads(config_path.read_text(encoding="utf-8"))
+
+    assert "rewrites" not in vercel_config
+    assert vercel_config["functions"]["api/index.py"]["maxDuration"] == 60
 
 
 def make_app(monkeypatch, tmp_path, secret="s3cret"):
