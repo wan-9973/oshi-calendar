@@ -363,6 +363,11 @@ def test_oshi_page_corrects_legacy_goods_and_offers_relation_filter(monkeypatch,
     script = client.get("/static/app.js").text
     assert 'nextDirection === "down"' in script
     assert 'nextDirection === "up"' in script
+    assert "scrollYBefore + heightAfter - heightBefore" in script
+    assert 'root.style.scrollBehavior = "auto"' in script
+    assert 'document.documentElement.style.overflowAnchor = "none"' in script
+    assert "performance.now() < ignoreToolbarScrollUntil" in script
+    assert "targetScrollY < stickyScrollY + 2" in script
     assert 'window.matchMedia("(max-width: 600px)")' in script
     assert 'setFilterPanelOpen(false, true)' in script
 

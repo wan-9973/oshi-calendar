@@ -534,17 +534,58 @@
     var directionStartY = lastScrollY;
     var scrollDirection = "";
     var scrollFramePending = false;
+    var ignoreToolbarScrollUntil = 0;
+    var scrollToImmediately = function (top, previousOverflowAnchor) {
+      var root = document.documentElement;
+      var previousScrollBehavior = root.style.scrollBehavior;
+      root.style.scrollBehavior = "auto";
+      window.scrollTo(0, Math.max(0, top));
+      window.requestAnimationFrame(function () {
+        root.style.scrollBehavior = previousScrollBehavior;
+        root.style.overflowAnchor = previousOverflowAnchor;
+      });
+    };
     var setToolbarCompact = function (compact) {
       if (mobileToolbarQuery.matches) compact = false;
+      if (calendarToolbar.classList.contains("is-compact") === compact) return false;
+
+      var headerHeight = parseFloat(getComputedStyle(document.documentElement)
+        .getPropertyValue("--header-height")) || 65;
+      var isSticky = toolbarSentinel && toolbarSentinel.getBoundingClientRect().top <= headerHeight + 1;
+      var scrollYBefore = window.scrollY;
+      var heightBefore = calendarToolbar.getBoundingClientRect().height;
+      var previousOverflowAnchor = document.documentElement.style.overflowAnchor;
+      if (isSticky) document.documentElement.style.overflowAnchor = "none";
       calendarToolbar.classList.toggle("is-compact", compact);
       if (!compact && filterPanelOpen && !mobileToolbarQuery.matches) {
         setFilterPanelOpen(false, false);
       }
+      if (isSticky) {
+        var heightAfter = calendarToolbar.getBoundingClientRect().height;
+        var targetScrollY = scrollYBefore + heightAfter - heightBefore;
+        var stickyScrollY = scrollYBefore + toolbarSentinel.getBoundingClientRect().top - headerHeight;
+        if (compact && targetScrollY < stickyScrollY + 2) {
+          calendarToolbar.classList.remove("is-compact");
+          document.documentElement.style.overflowAnchor = previousOverflowAnchor;
+          return false;
+        }
+        ignoreToolbarScrollUntil = performance.now() + 200;
+        scrollToImmediately(targetScrollY, previousOverflowAnchor);
+      }
+      lastScrollY = window.scrollY;
+      directionStartY = lastScrollY;
+      scrollDirection = compact ? "down" : "up";
+      return true;
     };
     var updateToolbarForScroll = function () {
       scrollFramePending = false;
       var currentY = Math.max(0, window.scrollY);
       if (mobileToolbarQuery.matches) {
+        lastScrollY = currentY;
+        directionStartY = currentY;
+        return;
+      }
+      if (performance.now() < ignoreToolbarScrollUntil) {
         lastScrollY = currentY;
         directionStartY = currentY;
         return;
@@ -568,7 +609,7 @@
           setToolbarCompact(false);
         }
       }
-      lastScrollY = currentY;
+      lastScrollY = Math.max(0, window.scrollY);
     };
     var requestToolbarUpdate = function () {
       if (scrollFramePending) return;
