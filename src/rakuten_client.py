@@ -42,10 +42,11 @@ class RateLimiter:
     def wait(self) -> None:
         with self._lock:
             now = time.monotonic()
-            delta = now - self._last
-            if delta < self.interval:
-                time.sleep(self.interval - delta)
-            self._last = time.monotonic()
+            target = self._last + self.interval
+            while now < target:
+                time.sleep(target - now)
+                now = time.monotonic()
+            self._last = now
 
 
 _rate_limiter = RateLimiter(config.REQUEST_INTERVAL_SEC)

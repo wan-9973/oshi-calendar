@@ -4,6 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}{{ site_name }}{% endblock %}</title>
+  <meta name="description" content="{% block description %}推しの新刊・新譜・発売予定・関連グッズをひとつのカレンダーで確認できる、無料・ログイン不要のWebサービスです。{% endblock %}">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="{{ site_name }}">
+  <meta property="og:title" content="{{ self.title() | striptags }}">
+  <meta property="og:description" content="{{ self.description() | striptags }}">
+  <meta property="og:url" content="{{ request.url }}">
   <meta name="theme-color" content="#FBF9F7">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

@@ -1,11 +1,11 @@
-{% macro card(c, show_oshi=false) -%}
+{% macro card(c, show_oshi=false, show_calendar=false) -%}
 <article class="card-shell" data-variation-key="{{ c.variation_key }}" data-sales-month="{{ c.sales_month }}">
-<a class="card" data-media="{{ c.media_key }}"{% if c.oshi_id %} data-oshi-id="{{ c.oshi_id }}"{% endif %} href="{{ c.url }}" rel="nofollow sponsored" target="_blank">
+<a class="card" data-media="{{ c.media_key }}" data-relation="{{ c.relation_key }}"{% if c.oshi_id %} data-oshi-id="{{ c.oshi_id }}"{% endif %} href="{{ c.url }}" rel="nofollow sponsored" target="_blank">
   <div class="card-media">
     {% if c.image %}<img src="{{ c.image }}" alt="{{ c.title }}" loading="lazy" decoding="async" width="480" height="480">{% else %}<div class="image-placeholder" role="img" aria-label="{{ c.title }}の画像はありません"><span aria-hidden="true">📦</span><small>NO IMAGE</small></div>{% endif %}
   </div>
   <div class="card-body">
-    <div class="badge-row"><span class="badge">{{ c.media }}</span>{% if c.is_new %}<span class="badge new">NEW</span>{% endif %}{% if show_oshi and c.oshi_name %}<span class="badge oshi-chip">{{ c.oshi_name }}</span>{% endif %}</div>
+    <div class="badge-row"><span class="badge">{{ c.media }}</span><span class="badge relation relation-{{ c.relation_key }}">{{ c.relation }}</span>{% if c.is_new %}<span class="badge new">NEW</span>{% endif %}{% if show_oshi and c.oshi_name %}<span class="badge oshi-chip">{{ c.oshi_name }}</span>{% endif %}</div>
     <h3 title="{{ c.title }}">{{ c.title }}</h3>
     {% if c.author %}<p class="author">{{ c.author }}</p>{% endif %}
     <div class="card-details">
@@ -20,5 +20,6 @@
     </div>
   </div>
 </a>
+{% if show_calendar and c.sales_date_precision == "day" %}<button class="calendar-add-button" type="button" data-calendar-item data-title="{{ c.title }}" data-sales-date="{{ c.sales_date_iso }}" data-oshi-id="{{ c.oshi_id }}" data-oshi-name="{{ c.oshi_name }}" data-item-url="{{ c.url }}" aria-label="{{ c.title }}の発売日をカレンダーに追加">📅 カレンダーに追加</button>{% endif %}
 </article>
 {%- endmacro %}

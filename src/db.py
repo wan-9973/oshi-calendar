@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+from pathlib import Path
 
 from sqlalchemy import (Column, DateTime, Float, ForeignKey, Integer, String,
                         Text, create_engine, event, inspect, text)
@@ -109,6 +110,9 @@ def get_engine(url: str | None = None):
     if _engine is None or url is not None:
         u = url or _default_url()
         if u.startswith("sqlite"):
+            if u.startswith("sqlite:///") and not u.endswith(":memory:"):
+                sqlite_path = Path(u.removeprefix("sqlite:///"))
+                sqlite_path.parent.mkdir(parents=True, exist_ok=True)
             _engine = create_engine(u, connect_args={"check_same_thread": False})
 
             @event.listens_for(_engine, "connect")
