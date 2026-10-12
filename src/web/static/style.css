@@ -661,6 +661,21 @@ main {
 .site-footer p { margin: 5px 0; }
 .site-footer .operator, .site-footer .affiliate-note { color: var(--ink); font-weight: 600; }
 .credit { margin-top: 12px; }
+.site-footer .policy-link a { display: inline-block; min-height: 32px; padding: 6px 0; color: var(--accent-strong); font-weight: 600; }
+
+/* プライバシーポリシー */
+.policy-page { max-width: 780px; margin: 0 auto; line-height: 1.85; }
+.policy-page h1 { margin-bottom: 4px; font-size: clamp(1.6rem, 3.4vw, 2.1rem); }
+.policy-page section { margin-top: 36px; }
+.policy-page h2 { margin-bottom: 10px; font-size: 1.15rem; }
+.policy-page ul { padding-left: 1.3em; }
+.policy-page li + li { margin-top: 8px; }
+.policy-page a { color: var(--accent-strong); font-weight: 600; }
+.policy-table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--control-radius); background: var(--surface); }
+.policy-table { width: 100%; min-width: 560px; border-collapse: collapse; font-size: 0.86rem; line-height: 1.65; }
+.policy-table th, .policy-table td { padding: 10px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+.policy-table th { color: var(--muted); background: var(--surface-soft); font-weight: 700; white-space: nowrap; }
+.policy-table tr:last-child td { border-bottom: 0; }
 .back-to-top {
   position: fixed;
   right: 20px;

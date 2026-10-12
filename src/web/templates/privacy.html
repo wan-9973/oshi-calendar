@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block page_type %}privacy{% endblock %}
+{% block title %}プライバシーポリシー | {{ site_name }}{% endblock %}
+{% block description %}{{ site_name }}における利用者情報の取り扱い、アクセス解析ツール、Cookie等の利用と外部送信についてご説明します。{% endblock %}
+{% block content %}
+<article class="policy-page">
+  <h1>プライバシーポリシー</h1>
+  <p class="note">制定・最終改定日: {{ privacy_policy_updated }}</p>
+  <p>{{ site_name }}（以下「本サイト」）の運営者（{{ operator_name }}）は、本サイトの利用者に関する情報を以下のとおり取り扱います。</p>
+
+  <section>
+    <h2>1. 本サイトが保存しない情報</h2>
+    <p>本サイトには会員登録・ログイン機能はなく、氏名・メールアドレスなどの個人情報を入力いただくことはありません。</p>
+    <p>「マイ推しリスト」に登録した推しの情報は、お使いのブラウザ内（localStorage）にのみ保存され、本サイトのサーバーには送信・保存しません。ブラウザのサイトデータを削除すると消去されます。また、後述のアクセス解析ツールにもリストの内容は送信しません（マイ推しリストの画面はアクセス解析ツールの記録対象から表示内容を隠す設定にしています）。</p>
+    <p>トップページの検索欄に入力された推しの名前は、商品を検索するために本サイトのサーバーへ送信され、推しの情報として保存されます（どなたが検索したかは記録しません）。</p>
+  </section>
+
+  <section>
+    <h2>2. アクセス解析ツールの利用</h2>
+    <p>本サイトは、サービスの利用状況を把握し改善するため、次のアクセス解析ツールを利用しています。これらのツールはCookie等を使用して、個人を特定しない形で利用状況を収集します。</p>
+    <ul>
+      <li><strong>Google アナリティクス</strong>（Google LLC）: 閲覧したページ、閲覧日時、参照元、おおよその地域、端末・ブラウザの種類などを収集します。広告のパーソナライズ機能およびGoogleシグナルは無効にしています。データの取り扱いは <a href="https://policies.google.com/technologies/partner-sites?hl=ja" rel="noopener" target="_blank">Google のサービスを使用するサイトやアプリから収集した情報の Google による使用</a> および <a href="https://policies.google.com/privacy?hl=ja" rel="noopener" target="_blank">Google プライバシーポリシー</a> をご確認ください。</li>
+      <li><strong>Microsoft Clarity</strong>（Microsoft Corporation）: ページ上のクリック・スクロールなどの操作や表示状況を記録し、使いやすさの改善に利用します。データの取り扱いは <a href="https://privacy.microsoft.com/ja-jp/privacystatement" rel="noopener" target="_blank">Microsoft プライバシーに関する声明</a> をご確認ください。</li>
+    </ul>
+    <p>本サイト内での操作として、検索欄に入力した推しの名前、商品リンク・カレンダー追加・絞り込みなどの操作の有無、スクロール量、滞在時間を計測しています。</p>
+  </section>
+
+  <section>
+    <h2>3. 外部への情報送信（Cookie等）</h2>
+    <p>本サイトを閲覧すると、次の事業者へ利用者の端末から情報が送信されます。</p>
+    <div class="policy-table-wrap">
+      <table class="policy-table">
+        <thead><tr><th scope="col">送信先</th><th scope="col">送信される主な情報</th><th scope="col">利用目的</th></tr></thead>
+        <tbody>
+          <tr><td>Google LLC（Google アナリティクス）</td><td>閲覧ページのURL、閲覧日時、参照元、IPアドレス、端末・ブラウザ情報、Cookie等の識別子、上記の操作情報</td><td>利用状況の分析・サービス改善</td></tr>
+          <tr><td>Microsoft Corporation（Microsoft Clarity）</td><td>閲覧ページのURL、ページ上の操作・表示状況、IPアドレス、端末・ブラウザ情報、Cookie等の識別子</td><td>使いやすさの分析・サービス改善</td></tr>
+          <tr><td>Google LLC（Google Fonts）</td><td>IPアドレス、ブラウザ情報、閲覧ページのURL</td><td>表示用フォントの配信</td></tr>
+          <tr><td>楽天グループ株式会社</td><td>商品画像の読み込み時のIPアドレス・ブラウザ情報。商品リンクをクリックした場合は楽天のCookie等の識別子</td><td>商品画像の表示、楽天アフィリエイトの成果計測</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>このほか、本サイトをホスティングしているVercel Inc.が、サイトの運用・障害対応のためにアクセスログ（IPアドレス、閲覧日時、ブラウザ情報など）を記録します。</p>
+  </section>
+
+  <section>
+    <h2>4. 計測を拒否する方法</h2>
+    <ul>
+      <li>Google アナリティクスによる計測は、<a href="https://tools.google.com/dlpage/gaoptout?hl=ja" rel="noopener" target="_blank">Google アナリティクス オプトアウト アドオン</a> で無効にできます。</li>
+      <li>ブラウザの設定でCookieを無効にする、またはサイトデータを削除することで、アクセス解析ツールによる識別を制限できます。この場合も本サイトの機能は利用できます。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>5. 楽天アフィリエイトについて</h2>
+    <p>本サイトの商品リンクには楽天アフィリエイトを利用しています。リンク先での購入等の成果を計測するため、楽天グループ株式会社がCookie等を使用することがあります。詳しくは <a href="https://privacy.rakuten.co.jp/" rel="noopener" target="_blank">楽天グループ 個人情報保護方針</a> をご確認ください。</p>
+  </section>
+
+  <section>
+    <h2>6. 本ポリシーの変更</h2>
+    <p>本ポリシーの内容は、必要に応じて予告なく変更することがあります。変更後の内容は本ページに掲載した時点から効力を生じます。</p>
+  </section>
+
+  {% if contact %}
+  <section>
+    <h2>7. お問い合わせ</h2>
+    <p>本ポリシーに関するお問い合わせは、{% if contact.startswith("http") %}<a href="{{ contact }}" rel="noopener" target="_blank">お問い合わせ窓口</a>{% elif "@" in contact %}<a href="mailto:{{ contact }}">{{ contact }}</a>{% else %}{{ contact }}{% endif %}までご連絡ください。</p>
+  </section>
+  {% endif %}
+</article>
+{% endblock %}

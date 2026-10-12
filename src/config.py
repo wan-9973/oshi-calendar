@@ -33,6 +33,31 @@ RAKUTEN_AFFILIATE_ID = os.environ.get("RAKUTEN_AFFILIATE_ID", "")
 
 SITE_NAME = os.environ.get("SITE_NAME", "推しカレンダー")
 OPERATOR_NAME = os.environ.get("OPERATOR_NAME", "（運営者名を設定してください）")
+# プライバシーポリシーに載せる問い合わせ先（URLまたはメールアドレス。未設定なら項目ごと非表示）
+CONTACT = os.environ.get("CONTACT", "").strip()
+PRIVACY_POLICY_UPDATED = "2026年10月12日"
+
+# --- アクセス解析（欲望観測所と同じ GA4 + Microsoft Clarity 構成） ---
+# IDは環境変数のみ。Vercelでは Production 環境にだけ設定する。
+import re as _re
+
+
+def _validated_id(name: str, pattern: str) -> str:
+    """欲望観測所と同じ形式検証。形式外の値はHTMLへ出さない。"""
+    value = os.environ.get(name, "").strip()
+    return value if _re.fullmatch(pattern, value) else ""
+
+
+GA_MEASUREMENT_ID = _validated_id("GA_MEASUREMENT_ID", r"G-[A-Z0-9]{4,32}")
+CLARITY_PROJECT_ID = _validated_id("CLARITY_PROJECT_ID", r"[a-z0-9]{5,32}")
+ANALYTICS_SCHEMA_VERSION = "1"
+# 既定: Vercel本番のみ有効。ローカル・プレビューの閲覧で本番の数値を汚さないため。
+# 明示的に OSHI_ANALYTICS=1 / 0 で上書きできる。
+_analytics_flag = os.environ.get("OSHI_ANALYTICS", "").strip()
+ANALYTICS_ENABLED = (
+    _analytics_flag == "1" if _analytics_flag in ("0", "1")
+    else os.environ.get("VERCEL_ENV", "") == "production"
+) and bool(GA_MEASUREMENT_ID or CLARITY_PROJECT_ID)
 
 # R1: 1リクエスト/秒以下 → 安全側で1.2秒間隔・直列
 REQUEST_INTERVAL_SEC = 1.2

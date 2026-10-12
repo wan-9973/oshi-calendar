@@ -51,11 +51,19 @@ Vercel運用では `GET /api/health` が、直近のcrawl/retention成功時刻�
 - R5/R6: 課金機能なし。商品カードのリンクは`affiliateUrl`（楽天ドメイン）のみ。外部リンクなし。
 - R7: フッターのクレジットは公式スニペット原文（改変禁止）。
 - R2表示: 価格の取得時刻は価格キャッシュの時刻を価格の直下に表示する（商品メタの取得時刻とは別物）。24時間を超えた価格はレンダリング時点で非表示にし、「最新価格は楽天でご確認ください」+ メタ取得時刻に切り替える（`_card()`）。
-- R8: ログインなし。マイ推しリストはlocalStorageのみで、サーバーに個人データを保存しない。
+- R8: ログインなし。マイ推しリストはlocalStorageのみで、サーバーに個人データを保存しない。アクセス解析（GA4・Clarity）にもリストの中身は送らず、`/my` とトップの個人化欄は Clarity の記録でマスクする（`data-clarity-mask`）。
 - R9: NGワード+除外ジャンルIDフィルタ（`config.py`。ジャンルIDはライブ確認後に設定）。
 - 関連度フィルタ: 中古・楽譜/スコア・カラオケ等の「幅が広すぎる関連商品」を既定で除外し、推し本人の新刊・新譜・発売予定を見つけやすくする（`NG_NOISE_WORDS`）。取得時（`dedupe.is_noise`）と表示時（`web/app._not_noise`）の二層で弾き、既存データにも即時適用。`OSHI_FILTER_NOISE=0`で無効化可。
 - R10: **プレスリリースを打つ場合は楽天の事前書面許可が必要（規約19条）。無断発表禁止。**
 - 生データの再配布・DB公開はしない（規約10条9項）。`data/oshi.db`は非公開に保つこと。
+
+## アクセス解析とプライバシーポリシー
+
+- 欲望観測所と同じ **GA4 + Microsoft Clarity** 構成。`src/web/static/analytics.js` が `<script data-*>` 属性から計測IDを読み込む。
+- 計測タグは `VERCEL_ENV=production` かつ `GA_MEASUREMENT_ID` / `CLARITY_PROJECT_ID` のどちらかが設定されている場合のみ出力（`OSHI_ANALYTICS=1/0` で上書き可）。手順は `docs/deploy_vercel_supabase.md` ④-2。
+- GA4設定: 広告パーソナライズ・Googleシグナル無効、送信は beacon。全イベントに `page_type` と `analytics_schema_version` を付与。検索語のメールアドレス・電話番号らしき値は `[redacted]` に置換。`click_rakuten` / `add_my_oshi` は Clarity で録画を優先保存（upgrade）。滞在時間は10/30/60/180秒。計測IDは形式検証し、不正な値は出力しない。
+- 計測イベント（スキーマv1）: `search` / `search_complete` / `search_error` / `click_rakuten` / `add_my_oshi` / `remove_my_oshi` / `add_to_calendar` / `select_filter` / `select_month` / `select_navigation` / `load_more` / `view_variations` / `view_more` / `view_this_week` / `view_upcoming` / `view_newest` / `scroll_depth` / `engagement_milestone`。推しID・マイ推しリストの内容は送らない。
+- `/privacy` にプライバシーポリシー（アクセス解析・Cookie等・外部送信先の公表）を掲載し、全ページのフッターからリンク。計測内容や外部送信先を変えたら同ページと `config.PRIVACY_POLICY_UPDATED` を更新すること。
 
 ## 構成
 

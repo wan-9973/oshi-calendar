@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block page_type %}home{% endblock %}
 {% from "_card.html" import card %}
 {% block content %}
 <section class="search-box hero-section">
@@ -26,7 +27,7 @@
   <p id="search-error" class="error" hidden></p>
 </section>
 
-<section id="personalized-section" class="content-section personalized-section" hidden aria-busy="true">
+<section id="personalized-section" class="content-section personalized-section" data-content-section="personalized" data-clarity-mask="True" hidden aria-busy="true">
   <div class="section-heading-row">
     <h2 id="personalized-title" class="section-title">あなたの推しの発売予定</h2>
     <a class="text-link" href="/my">統合カレンダーを見る</a>
@@ -38,15 +39,15 @@
   <div id="personalized-grid" class="grid personalized-grid"></div>
 </section>
 
-<section class="content-section">
-  <h2 class="section-title">今週発売</h2>
+<section class="content-section" data-content-section="this_week">
+  <h2 class="section-title" data-analytics-section-event="view_this_week">今週発売</h2>
   {% if new_groups %}<div id="week-grid" class="grid">{% for group in new_groups %}<div class="variation-group" data-variation-group>{{ card(group.representative, show_oshi=true, show_calendar=true) }}{% if group.variations %}<details class="variations"><summary>他{{ group.variations | length }}件のバリエーションを見る</summary><div class="grid variation-grid">{% for c in group.variations %}{{ card(c, show_oshi=true, show_calendar=true) }}{% endfor %}</div></details>{% endif %}</div>{% endfor %}</div>
   {% if new_more_groups %}<details class="top-more"><summary>さらに{{ new_more_groups | length }}件を見る</summary><div class="grid">{% for group in new_more_groups %}<div class="variation-group" data-variation-group>{{ card(group.representative, show_oshi=true, show_calendar=true) }}{% if group.variations %}<details class="variations"><summary>他{{ group.variations | length }}件のバリエーションを見る</summary><div class="grid variation-grid">{% for c in group.variations %}{{ card(c, show_oshi=true, show_calendar=true) }}{% endfor %}</div></details>{% endif %}</div>{% endfor %}</div></details>{% endif %}
   {% else %}<div class="empty-state"><span class="empty-illustration" aria-hidden="true">📚</span><p>新着はまだありません。推しを検索してみてください。</p></div>{% endif %}
 </section>
 
-<section class="content-section">
-  <h2 class="section-title">今後の発売カレンダー <span>全体・60日</span></h2>
+<section class="content-section" data-content-section="upcoming">
+  <h2 class="section-title" data-analytics-section-event="view_upcoming">今後の発売カレンダー <span>全体・60日</span></h2>
   {% if upcoming_groups %}<div class="grid">{% for group in upcoming_groups %}<div class="variation-group" data-variation-group>{{ card(group.representative, show_oshi=true, show_calendar=true) }}{% if group.variations %}<details class="variations"><summary>他{{ group.variations | length }}件のバリエーションを見る</summary><div class="grid variation-grid">{% for c in group.variations %}{{ card(c, show_oshi=true, show_calendar=true) }}{% endfor %}</div></details>{% endif %}</div>{% endfor %}</div>
   {% if upcoming_more_groups %}<details class="top-more"><summary>さらに{{ upcoming_more_groups | length }}件を見る</summary><div class="grid">{% for group in upcoming_more_groups %}<div class="variation-group" data-variation-group>{{ card(group.representative, show_oshi=true, show_calendar=true) }}{% if group.variations %}<details class="variations"><summary>他{{ group.variations | length }}件のバリエーションを見る</summary><div class="grid variation-grid">{% for c in group.variations %}{{ card(c, show_oshi=true, show_calendar=true) }}{% endfor %}</div></details>{% endif %}</div>{% endfor %}</div></details>{% endif %}
   {% else %}<div class="empty-state"><span class="empty-illustration" aria-hidden="true">🌱</span><p>発売予定はまだありません。</p></div>{% endif %}
