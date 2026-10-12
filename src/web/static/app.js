@@ -25,6 +25,16 @@
     localStorage.setItem(KEY, JSON.stringify(list.slice(0, 50)));
   }
 
+  /* アクセス解析（analytics.js）への通知。未読込・無効時は何もしない。推しリストの中身は渡さない。 */
+  function track(name, params) {
+    try {
+      if (window.OshiAnalytics) window.OshiAnalytics.track(name, params);
+      else if (document.querySelector("script[data-analytics-schema-version]")) {
+        (window.__oshiAnalyticsQueue = window.__oshiAnalyticsQueue || []).push([name, params]);
+      }
+    } catch (e) { /* 計測失敗で本体機能を止めない */ }
+  }
+
   function showToast(message) {
     var toast = document.getElementById("toast");
     if (!toast) return;
@@ -89,7 +99,7 @@
       date.getDate().toString().padStart(2, "0");
   }
 
-  function downloadIcsCards(cards, label) {
+  function downloadIcsCards(cards, label, scope) {
     var exactCards = cards.filter(function (card) {
       return card.sales_date_precision === "day" && parseIsoDate(card.sales_date_iso);
     });
@@ -127,11 +137,12 @@
     link.remove();
     setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
     showToast(exactCards.length + "件のカレンダーファイルを作成しました");
+    track("add_to_calendar", { calendar_scope: scope || "item", item_count: exactCards.length });
   }
 
   function downloadIcs(card, oshiName) {
     downloadIcsCards([Object.assign({}, card, { oshi_name: card.oshi_name || oshiName })],
-      card.sales_date_iso || "item");
+      card.sales_date_iso || "item", "item");
   }
 
   function fetchOshiSummary(oshi) {
@@ -273,7 +284,7 @@
         monthCalendarDownload.dataset.year + "&m=" + monthCalendarDownload.dataset.month + "&limit=60")
         .then(function (response) { if (!response.ok) throw new Error(); return response.json(); })
         .then(function (data) {
-          downloadIcsCards(data.items || [], monthCalendarDownload.dataset.year + "-" + monthCalendarDownload.dataset.month);
+          downloadIcsCards(data.items || [], monthCalendarDownload.dataset.year + "-" + monthCalendarDownload.dataset.month, "oshi_month");
         })
         .catch(function () { showToast("カレンダーを作成できませんでした"); })
         .finally(function () { monthCalendarDownload.disabled = false; });
@@ -323,6 +334,8 @@
       var msg = document.getElementById("search-message");
       var detail = document.getElementById("search-detail");
       var err = document.getElementById("search-error");
+      if (window.OshiAnalytics) window.OshiAnalytics.trackSearch(name);
+      else track("search", { search_term: name });
       err.hidden = true;
       progress.hidden = false;
       setSearchLoading(true);
@@ -341,7 +354,8 @@
         }
       }, 1300);
 
-      var failSearch = function (message) {
+      var failSearch = function (message, reason) {
+        track("search_error", { reason: reason || "unknown" });
         clearInterval(simTimer);
         progress.hidden = true;
         err.textContent = message;
@@ -354,12 +368,13 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: name })
       }).then(function (r) {
-        if (r.status === 429) throw new Error("検索が混み合っています。1分ほど待ってからお試しください。");
-        if (!r.ok) throw new Error("検索を開始できませんでした。");
+        if (r.status === 429) throw Object.assign(new Error("検索が混み合っています。1分ほど待ってからお試しください。"), { reason: "rate_limited" });
+        if (!r.ok) throw Object.assign(new Error("検索を開始できませんでした。"), { reason: "start_failed" });
         return r.json();
       }).then(function (data) {
         clearInterval(simTimer);
         if (data.status === "cached" || data.status === "done") {
+          track("search_complete", { result: data.status });
           showPageSkeleton();
           location.href = "/oshi/" + data.oshi_id;
           return;
@@ -374,20 +389,21 @@
             msg.textContent = st.message;
             if (st.status === "done") {
               clearInterval(timer);
+              track("search_complete", { result: "job_done" });
               showPageSkeleton();
               location.href = "/oshi/" + st.oshi_id;
             }
             if (st.status === "error") {
               clearInterval(timer);
-              failSearch("一時的に取得できません。時間をおいてお試しください。");
+              failSearch("一時的に取得できません。時間をおいてお試しください。", "job_error");
             }
           }).catch(function () {
             clearInterval(timer);
-            failSearch("検索状況を取得できませんでした。もう一度お試しください。");
+            failSearch("検索状況を取得できませんでした。もう一度お試しください。", "status_failed");
           });
         }, 1200);
       }).catch(function (e) {
-        failSearch(e.message);
+        failSearch(e.message, e.reason || "network");
       });
     });
   }
@@ -477,9 +493,11 @@
       if (index >= 0) {
         list.splice(index, 1);
         showToast("マイ推しリストから解除しました");
+        track("remove_my_oshi", { source: "oshi_page" });
       } else {
         list.push({ id: id, name: name });
         showToast("マイ推しリストに追加しました");
+        track("add_my_oshi", { source: "oshi_page" });
       }
       saveList(list);
       renderFavorite();
@@ -855,7 +873,7 @@
     };
 
     myCalendarDownload.addEventListener("click", function () {
-      downloadIcsCards(myVisibleCards, myMonths[myMonthIndex] || "my-oshi");
+      downloadIcsCards(myVisibleCards, myMonths[myMonthIndex] || "my-oshi", "my_month");
     });
 
     var renderOshiSections = function () {
@@ -896,6 +914,7 @@
           myCalendarCache = {};
           renderMyPage();
           showToast("マイ推しリストから削除しました");
+          track("remove_my_oshi", { source: "my_page" });
         });
         header.appendChild(actions);
         section.appendChild(header);

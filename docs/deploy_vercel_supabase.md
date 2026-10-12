@@ -51,6 +51,22 @@
    `SITE_URL`（=②の実URL。APIリクエストのRefererとして送信）
 2. Deployments → 最新デプロイの「…」→ Redeploy（環境変数を反映）
 
+## ④-2 アクセス解析（欲望観測所と同じ GA4 + Microsoft Clarity）
+
+1. Google アナリティクスで推しカレンダー用のプロパティ（ウェブストリーム）を作成し、測定ID（`G-` で始まる）を控える。
+   欲望観測所とは別プロパティにする（数値が混ざらないようにするため）。
+2. Microsoft Clarity で推しカレンダー用のプロジェクトを作成し、プロジェクトID（`clarity.ms/tag/` の後ろの英数字）を控える。
+3. Vercel → Settings → Environment Variables に **Production のみ** で追加:
+   `GA_MEASUREMENT_ID` / `CLARITY_PROJECT_ID`（任意で `CONTACT`＝プライバシーポリシーの問い合わせ先URLまたはメールアドレス）
+4. Redeploy 後、本番トップのHTMLに `/static/analytics.js?v=1` の `<script>` が出ていること、
+   GA4 の「リアルタイム」に自分のアクセスが表示されることを確認する。
+   - 計測タグは `VERCEL_ENV=production` かつIDが1つ以上設定されている場合だけ出力される（プレビュー・ローカルでは出ない）。
+   - ローカルで動作確認したい場合のみ `OSHI_ANALYTICS=1` を設定する。
+5. GA4 管理画面で次を設定する（欲望観測所と同じ運用にする場合）:
+   - データ保持期間: 14か月
+   - カスタムディメンション（イベントスコープ）: `page_type` / `content_section` / `search_term` / `media` / `relation` / `filter_type` / `filter_value` / `calendar_scope`
+   - キーイベント: `click_rakuten`（楽天遷移）、`add_my_oshi`、`add_to_calendar`
+
 ## ⑤ 動作確認（ライブ検証）
 
 1. トップページで推し名を1件検索（約10〜15秒。プログレスバーが進んで推しページが開けば成功）

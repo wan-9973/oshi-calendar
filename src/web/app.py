@@ -44,6 +44,14 @@ templates.env.globals.update(
     operator_name=config.OPERATOR_NAME,
     credit_snippet=config.CREDIT_SNIPPET,
     disclaimer=config.disclaimer(),
+    analytics={
+        "enabled": config.ANALYTICS_ENABLED,
+        "ga_measurement_id": config.GA_MEASUREMENT_ID,
+        "clarity_project_id": config.CLARITY_PROJECT_ID,
+        "schema_version": config.ANALYTICS_SCHEMA_VERSION,
+    },
+    contact=config.CONTACT,
+    privacy_policy_updated=config.PRIVACY_POLICY_UPDATED,
 )
 
 MEDIA_TABS = [("book", "書籍"), ("cd", "CD"), ("dvd", "映像"), ("magazine", "雑誌"),
@@ -462,6 +470,12 @@ def my_page(request: Request):
     return templates.TemplateResponse(request, "my.html", {})
 
 
+@app.get("/privacy", response_class=HTMLResponse)
+def privacy_page(request: Request):
+    """プライバシーポリシー（アクセス解析・外部送信・Cookie等の公表）。"""
+    return templates.TemplateResponse(request, "privacy.html", {})
+
+
 @app.get("/robots.txt", response_class=PlainTextResponse)
 def robots(request: Request):
     base = str(request.base_url).rstrip("/")
@@ -473,7 +487,7 @@ def sitemap(request: Request):
     base = str(request.base_url).rstrip("/")
     with db.session() as s:
         oshi_ids = [row.id for row in s.query(db.Oshi.id).filter(db.Oshi.hidden == 0).all()]
-    urls = [f"{base}/", *(f"{base}/oshi/{oshi_id}" for oshi_id in oshi_ids)]
+    urls = [f"{base}/", f"{base}/privacy", *(f"{base}/oshi/{oshi_id}" for oshi_id in oshi_ids)]
     body = '<?xml version="1.0" encoding="UTF-8"?>\n' \
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + \
         "".join(f"  <url><loc>{escape(url)}</loc></url>\n" for url in urls) + "</urlset>\n"

@@ -14,12 +14,13 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&amp;family=Zen+Maru+Gothic:wght@500;700&amp;display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/style.css?v=20260804-toolbar-jump-fix">
+  <link rel="stylesheet" href="/static/style.css?v=20261012-privacy">
+  {% if analytics.enabled %}<script defer src="/static/analytics.js?v=1" data-analytics-schema-version="{{ analytics.schema_version }}"{% if analytics.ga_measurement_id %} data-ga-measurement-id="{{ analytics.ga_measurement_id }}"{% endif %}{% if analytics.clarity_project_id %} data-clarity-project-id="{{ analytics.clarity_project_id }}"{% endif %}></script>{% endif %}
 </head>
-<body>
+<body data-analytics-page-type="{% block page_type %}other{% endblock %}">
 <header class="site-header">
-  <a class="logo" href="/" aria-label="{{ site_name }} トップへ"><span aria-hidden="true">🗓️</span>{{ site_name }}</a>
-  <nav aria-label="メインナビゲーション"><a class="my-list-link" href="/my">マイ推しリスト</a></nav>
+  <a class="logo" href="/" data-analytics-event="select_navigation" data-target-id="logo" aria-label="{{ site_name }} トップへ"><span aria-hidden="true">🗓️</span>{{ site_name }}</a>
+  <nav aria-label="メインナビゲーション"><a class="my-list-link" href="/my" data-analytics-event="select_navigation" data-target-id="my_list">マイ推しリスト</a></nav>
 </header>
 <main>
   <p class="affiliate-disclosure" role="note">商品リンクには楽天アフィリエイトリンクを使用しています。</p>
@@ -28,6 +29,7 @@
 <footer class="site-footer">
   <p class="disclaimer">{{ disclaimer }}</p>
   <p class="operator">運営者: {{ operator_name }}</p>
+  <p class="policy-link"><a href="/privacy" data-analytics-event="select_navigation" data-target-id="privacy">プライバシーポリシー</a></p>
   <p class="affiliate-note">商品リンクは楽天アフィリエイトです</p>
   <div class="credit">{{ credit_snippet | safe }}</div>
 </footer>
@@ -43,6 +45,6 @@
     </div>
   </div>
 </div>
-<script src="/static/app.js?v=20260804-toolbar-jump-fix"></script>
+<script src="/static/app.js?v=20261012-analytics"></script>
 </body>
 </html>

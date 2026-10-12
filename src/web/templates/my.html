@@ -1,8 +1,9 @@
 {% extends "base.html" %}
+{% block page_type %}my{% endblock %}
 {% block title %}マイ推しリスト | {{ site_name }}{% endblock %}
 {% block description %}登録した推しの発売予定を、端末内だけに保存してまとめて確認できます。{% endblock %}
 {% block content %}
-<section id="my-calendar" class="content-section my-calendar" hidden aria-busy="true">
+<section id="my-calendar" class="content-section my-calendar" data-content-section="my_calendar" data-clarity-mask="True" hidden aria-busy="true">
   <h2 class="section-title">みんなの供給をひとつに</h2>
   <div class="calendar-toolbar my-calendar-toolbar">
     <nav class="month-nav" aria-label="統合カレンダーの表示月">
@@ -19,7 +20,7 @@
   <div id="my-calendar-timeline" class="timeline"></div>
 </section>
 
-<section class="content-section">
+<section class="content-section" data-content-section="my_list" data-clarity-mask="True">
   <h2 class="section-title">登録中の推し</h2>
   <div id="my-list" class="my-list"><div class="empty-state"><span class="empty-illustration" aria-hidden="true">💗</span><h2>まだ推しが登録されていません</h2><p>登録すると、複数の推しの次の発売をここだけで確認できます。</p><p class="note">登録情報はこの端末だけに保存され、サーバーには送信されません。</p><a class="primary-link" href="/">推しを検索する</a></div></div>
 </section>
