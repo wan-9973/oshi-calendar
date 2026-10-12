@@ -672,3 +672,17 @@ def test_display_filter_hides_preexisting_noise(monkeypatch, tmp_path):
     assert "LOST CORNER (通常盤)" in titles
     assert all("中古" not in t and "バンドスコア" not in t for t in titles)
     assert r.json()["total"] == 1
+
+
+def test_postgres_url_uses_installed_psycopg2_driver(monkeypatch):
+    """SQLAlchemy 2.1で既定ドライバーがpsycopg(v3)に変わっても、psycopg2で接続する。"""
+    from src import config, db
+    for given in ("postgres://u:p@h:6543/postgres", "postgresql://u:p@h:6543/postgres"):
+        monkeypatch.setattr(config, "DATABASE_URL", given)
+        assert db._default_url() == "postgresql+psycopg2://u:p@h:6543/postgres"
+    monkeypatch.setattr(config, "DATABASE_URL", "postgresql+psycopg2://u:p@h/db")
+    assert db._default_url() == "postgresql+psycopg2://u:p@h/db"
+
+    import sqlalchemy
+    engine = sqlalchemy.create_engine(db._default_url())
+    assert engine.dialect.driver == "psycopg2"

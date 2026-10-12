@@ -101,6 +101,10 @@ def _default_url() -> str:
         # SQLAlchemy 2.0はpostgres://を受けないため補正（Supabaseの古い接続文字列対策）
         if u.startswith("postgres://"):
             u = "postgresql://" + u[len("postgres://"):]
+        # SQLAlchemy 2.1から postgresql:// の既定ドライバーが psycopg(v3) に変わったため、
+        # requirements.txt で入れている psycopg2 を明示する（未指定だと本番で起動不能になる）。
+        if u.startswith("postgresql://"):
+            u = "postgresql+psycopg2://" + u[len("postgresql://"):]
         return u
     return f"sqlite:///{config.DB_PATH}"
 
