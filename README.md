@@ -61,7 +61,7 @@ Vercel運用では `GET /api/health` が、直近のcrawl/retention成功時刻�
 
 - 欲望観測所と同じ **GA4 + Microsoft Clarity** 構成。`src/web/static/analytics.js` が `<script data-*>` 属性から計測IDを読み込む。
 - 計測タグは `VERCEL_ENV=production` かつ `GA_MEASUREMENT_ID` / `CLARITY_PROJECT_ID` のどちらかが設定されている場合のみ出力（`OSHI_ANALYTICS=1/0` で上書き可）。手順は `docs/deploy_vercel_supabase.md` ④-2。
-- GA4設定: 広告パーソナライズ・Googleシグナル無効、送信は beacon。全イベントに `page_type` と `analytics_schema_version` を付与。
+- GA4設定: 広告パーソナライズ・Googleシグナル無効、送信は beacon。全イベントに `page_type` と `analytics_schema_version` を付与。検索語のメールアドレス・電話番号らしき値は `[redacted]` に置換。`click_rakuten` / `add_my_oshi` は Clarity で録画を優先保存（upgrade）。滞在時間は10/30/60/180秒。計測IDは形式検証し、不正な値は出力しない。
 - 計測イベント（スキーマv1）: `search` / `search_complete` / `search_error` / `click_rakuten` / `add_my_oshi` / `remove_my_oshi` / `add_to_calendar` / `select_filter` / `select_month` / `select_navigation` / `load_more` / `view_variations` / `view_more` / `view_this_week` / `view_upcoming` / `view_newest` / `scroll_depth` / `engagement_milestone`。推しID・マイ推しリストの内容は送らない。
 - `/privacy` にプライバシーポリシー（アクセス解析・Cookie等・外部送信先の公表）を掲載し、全ページのフッターからリンク。計測内容や外部送信先を変えたら同ページと `config.PRIVACY_POLICY_UPDATED` を更新すること。
 

@@ -53,7 +53,10 @@ def test_enabled_flag_requires_an_id(monkeypatch):
     try:
         importlib.reload(config)
         assert config.ANALYTICS_ENABLED is False
-        monkeypatch.setenv("GA_MEASUREMENT_ID", "G-X")
+        monkeypatch.setenv("GA_MEASUREMENT_ID", "G-X")  # 形式外は無効
+        importlib.reload(config)
+        assert config.ANALYTICS_ENABLED is False
+        monkeypatch.setenv("GA_MEASUREMENT_ID", "G-ABC1234")
         importlib.reload(config)
         assert config.ANALYTICS_ENABLED is True
         monkeypatch.setenv("VERCEL_ENV", "preview")

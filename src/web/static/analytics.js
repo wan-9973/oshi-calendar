@@ -21,6 +21,7 @@
     "load_more", "view_variations", "view_more",
     "scroll_depth", "engagement_milestone"
   ];
+  var HIGH_VALUE_EVENTS = ["click_rakuten", "add_my_oshi"];
 
   /* --- GA4 --- */
   window.dataLayer = window.dataLayer || [];
@@ -56,14 +57,23 @@
     window.clarity("set", "analytics_schema_version", SCHEMA_VERSION);
   }
 
+  /* 欲望観測所と同じ: 検索語にメールアドレス・電話番号らしき値があれば送らない */
+  function looksSensitive(value) {
+    return /\b[^\s@]+@[^\s@]+\.[^\s@]+\b/.test(value) || /(?:\+?\d[\d\s().-]{8,}\d)/.test(value);
+  }
+
   function clean(params) {
     var out = {};
     Object.keys(params || {}).forEach(function (key) {
       var value = params[key];
-      if (value === null || value === undefined || value === "") return;
+      if (value === null || value === undefined) return;
       if (typeof value === "number" && isFinite(value)) out[key] = value;
       else if (typeof value === "boolean") out[key] = value;
-      else out[key] = String(value).slice(0, 100);
+      else if (typeof value === "string") {
+        var text = value.trim().slice(0, 100);
+        if (!text) return;
+        out[key] = key === "search_term" && looksSensitive(text) ? "[redacted]" : text;
+      }
     });
     return out;
   }
@@ -72,8 +82,15 @@
     if (EVENTS.indexOf(name) < 0) return;
     var payload = clean(params);
     payload.page_type = PAGE_TYPE;
+    payload.analytics_schema_version = SCHEMA_VERSION;
     try { if (GA_ID && window.gtag) window.gtag("event", name, payload); } catch (e) { /* 計測失敗は無視 */ }
-    try { if (CLARITY_ID && window.clarity) window.clarity("event", name); } catch (e) { /* 同上 */ }
+    try {
+      if (CLARITY_ID && window.clarity) {
+        window.clarity("event", name);
+        /* 価値の高い行動があったセッションは録画を優先保存する */
+        if (HIGH_VALUE_EVENTS.indexOf(name) >= 0) window.clarity("upgrade", name);
+      }
+    } catch (e) { /* 同上 */ }
   }
 
   function trackSearch(term) {
@@ -190,14 +207,14 @@
     if (!depthTicking) { depthTicking = true; window.requestAnimationFrame(checkDepth); }
   }, { passive: true });
 
-  /* --- 表示中の滞在時間（30秒/60秒/180秒、各1回） --- */
-  var milestones = [30, 60, 180];
+  /* --- 表示中の滞在時間（10秒/30秒/60秒/180秒、各1回。欲望観測所と同じ） --- */
+  var milestones = [10, 30, 60, 180];
   var visibleSeconds = 0;
   setInterval(function () {
     if (document.visibilityState !== "visible") return;
-    visibleSeconds += 5;
+    visibleSeconds += 1;
     while (milestones.length && visibleSeconds >= milestones[0]) {
-      track("engagement_milestone", { seconds: milestones.shift() });
+      track("engagement_milestone", { engagement_seconds: milestones.shift() });
     }
-  }, 5000);
+  }, 1000);
 })();

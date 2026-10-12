@@ -39,8 +39,17 @@ PRIVACY_POLICY_UPDATED = "2026年10月12日"
 
 # --- アクセス解析（欲望観測所と同じ GA4 + Microsoft Clarity 構成） ---
 # IDは環境変数のみ。Vercelでは Production 環境にだけ設定する。
-GA_MEASUREMENT_ID = os.environ.get("GA_MEASUREMENT_ID", "").strip()
-CLARITY_PROJECT_ID = os.environ.get("CLARITY_PROJECT_ID", "").strip()
+import re as _re
+
+
+def _validated_id(name: str, pattern: str) -> str:
+    """欲望観測所と同じ形式検証。形式外の値はHTMLへ出さない。"""
+    value = os.environ.get(name, "").strip()
+    return value if _re.fullmatch(pattern, value) else ""
+
+
+GA_MEASUREMENT_ID = _validated_id("GA_MEASUREMENT_ID", r"G-[A-Z0-9]{4,32}")
+CLARITY_PROJECT_ID = _validated_id("CLARITY_PROJECT_ID", r"[a-z0-9]{5,32}")
 ANALYTICS_SCHEMA_VERSION = "1"
 # 既定: Vercel本番のみ有効。ローカル・プレビューの閲覧で本番の数値を汚さないため。
 # 明示的に OSHI_ANALYTICS=1 / 0 で上書きできる。
