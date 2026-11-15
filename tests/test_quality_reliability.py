@@ -41,13 +41,14 @@ def test_repair_is_reversible_and_dry_run_does_not_write(test_db):
                            title="AIYOU", author_or_artist="Eve",
                            item_url="https://books.rakuten.co.jp/good", relevance=1)])
         s.commit()
-    assert reclassify()["excluded"] == 1
+    assert reclassify()["excluded"] == 0
     with db.session() as s:
         assert s.query(db.Item).filter_by(item_code="bad").one().quality_excluded == 0
-    assert reclassify(apply=True)["excluded"] == 1
+    assert reclassify(apply=True)["excluded"] == 0
     with db.session() as s:
         assert s.query(db.Item).count() == 2
-        assert s.query(db.Item).filter_by(item_code="bad").one().quality_excluded == 1
+        assert s.query(db.Item).filter_by(item_code="bad").one().quality_excluded == 0
+        assert s.query(db.Item).filter_by(item_code="bad").one().relevance == 0
         assert s.query(db.Item).filter_by(item_code="good").one().quality_excluded == 0
     assert reclassify(apply=True)["changed"] == 0
 
@@ -111,11 +112,13 @@ def test_additive_migration_preserves_existing_items(test_db):
     engine = db.get_engine()
     with engine.begin() as conn:
         conn.execute(text('ALTER TABLE items DROP COLUMN quality_excluded'))
+        conn.execute(text('ALTER TABLE items DROP COLUMN caption'))
         conn.execute(text('ALTER TABLE crawl_queue DROP COLUMN pending_apis_json'))
     db._migrate(engine)
     db._migrate(engine)
     with db.session() as s:
         assert s.query(db.Item).one().quality_excluded == 0
+        assert s.query(db.Item).one().caption == ''
         assert s.get(db.CrawlQueue, oid).pending_apis == []
 
 def test_formal_names_character_credits_and_collaborations():
@@ -128,3 +131,16 @@ def test_formal_names_character_credits_and_collaborations():
     assert relevance_score({'author_or_artist': '中野家の五つ子（花澤香菜・竹達彩奈）'}, '花澤香菜', []) == 1
     assert relevance_score({'author_or_artist': 'ミッキー・ローク'}, 'ミッキー', []) == 0
     assert relevance_score({'author_or_artist': 'Evelyn van Kelle'}, 'Eve', []) == 0
+
+def test_all_media_reclassification_does_not_hide_uncertain_products(test_db):
+    oid, _ = find_or_create_oshi('Eve')
+    with db.session() as s:
+        for i, api in enumerate(['ichiba', 'books_total', 'books_game', 'books_magazine']):
+            s.add(db.Item(oshi_id=oid, source_api=api, item_code=f'broad-{i}',
+                          title='うたのプリンス Best Shots from Everyday Life', author_or_artist='メーカー',
+                          item_url='https://books.rakuten.co.jp/x', relevance=.7))
+        s.commit()
+    assert reclassify(apply=True)['changed'] == 4
+    with db.session() as s:
+        assert s.query(db.Item).filter_by(quality_excluded=0).count() == 4
+        assert all(item.relevance == 0 for item in s.query(db.Item).all())

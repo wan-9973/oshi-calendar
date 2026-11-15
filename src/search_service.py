@@ -184,6 +184,7 @@ def save_results(oshi_id: int, merged: list[dict]) -> int:
             row.media = rec["media"]
             row.title = rec["title"]
             row.author_or_artist = rec["author_or_artist"]
+            row.caption = rec.get("caption", "")
             row.sales_date = rec["sales_date"]
             row.sales_date_iso = rec["sales_date_iso"]
             row.sales_date_precision = rec["sales_date_precision"]

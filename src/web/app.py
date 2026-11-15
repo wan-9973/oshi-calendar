@@ -27,7 +27,7 @@ from .. import config, db
 from ..entity_profiles import profile_for
 from ..calendar_service import month_calendar
 from ..crawler import run_once as crawl_run_once
-from ..dedupe import classify_media, _author_parts, name_variants
+from ..dedupe import classify_media, _author_parts, name_variants, relevance_score
 from ..monitoring import health_snapshot, run_job
 from ..search_gate import acquire, release, key_for
 from ..retention import run_once as retention_run_once
@@ -228,8 +228,8 @@ def _cards_for(s, items: list[db.Item], oshi: db.Oshi | None = None) -> list[dic
         # legacy data also renders the canonical oshi name without a migration.
         profile = profile_for(oshi.name)
         aliases = [*oshi.aliases, *((profile or {}).get("aliases") or [])]
-        for card in cards:
-            _check_direct_relation(card, oshi.name, aliases)
+        for item, card in zip(items, cards):
+            _check_relation(card, oshi.name, aliases, item.caption)
             card["author"] = _display_author(card["author"], oshi.name, aliases)
             card["oshi_name"] = oshi.name
     else:
@@ -242,17 +242,25 @@ def _cards_for(s, items: list[db.Item], oshi: db.Oshi | None = None) -> list[dic
                 continue
             profile = profile_for(owner.name)
             aliases = [*owner.aliases, *((profile or {}).get("aliases") or [])]
-            _check_direct_relation(card, owner.name, aliases)
+            _check_relation(card, owner.name, aliases, item.caption)
             card["author"] = _display_author(card["author"], owner.name, aliases)
             card["oshi_name"] = owner.name
     return cards
 
 
-def _check_direct_relation(card: dict, name: str, aliases: list[str]) -> None:
-    if card["relation_key"] == "direct" and not any(
-        value in _author_parts(card["author"]) for value in name_variants(name, aliases)
-    ):
+def _check_relation(card: dict, name: str, aliases: list[str], caption: str = "") -> None:
+    profile = profile_for(name) or {}
+    score = relevance_score({"title": card["title"], "author_or_artist": card["author"],
+                             "caption": caption or ""}, name, aliases, profile.get("anchors", []))
+    if score < config.SCORE_TITLE_MATCH:
+        card["relation_key"], card["relation"] = "unverified", "関連未確認"
+    elif card["media_key"] == "goods":
+        card["relation_key"], card["relation"] = "goods", "グッズ関連"
+    elif score >= config.SCORE_FIELD_MATCH:
+        card["relation_key"], card["relation"] = "direct", "本人名義"
+    else:
         card["relation_key"], card["relation"] = "related", "出演・関連"
+    card["relation_note"] = f"{name}との関連は確認できていません。" if score < config.SCORE_TITLE_MATCH else ""
 
 
 def _variation_key(title: str) -> str:
@@ -443,7 +451,7 @@ def oshi_page(request: Request, oshi_id: int, y: int | None = None, m: int | Non
         relation_tabs = [
             {"key": key, "label": label,
              "count": sum(1 for card in month_cards if card["relation_key"] == key)}
-            for key, label in (("direct", "本人名義"), ("related", "出演・関連"), ("goods", "グッズ"))
+            for key, label in (("direct", "本人名義"), ("related", "出演・関連"), ("goods", "グッズ"), ("unverified", "関連未確認"))
         ]
 
         newest_query = s.query(db.Item).filter(db.Item.oshi_id == oshi_id, _visible())
