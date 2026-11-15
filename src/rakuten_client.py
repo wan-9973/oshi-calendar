@@ -16,6 +16,17 @@ import requests
 
 from . import config
 
+
+class DeadlineReached(Exception):
+    pass
+
+
+def remaining(deadline: float | None) -> float:
+    seconds = float("inf") if deadline is None else deadline - time.monotonic()
+    if seconds <= 0:
+        raise DeadlineReached()
+    return seconds
+
 logger = logging.getLogger(__name__)
 
 # エンドポイント（docs/phase0_field_mapping.md で原文確認済み）
@@ -39,11 +50,13 @@ class RateLimiter:
         self._lock = threading.Lock()
         self._last = 0.0
 
-    def wait(self) -> None:
+    def wait(self, deadline: float | None = None) -> None:
         with self._lock:
             now = time.monotonic()
             target = self._last + self.interval
             while now < target:
+                if target - now >= remaining(deadline):
+                    raise DeadlineReached()
                 time.sleep(target - now)
                 now = time.monotonic()
             self._last = now
@@ -62,7 +75,7 @@ class DbRateLimiter:
     def __init__(self, interval: float):
         self.interval = interval
 
-    def wait(self) -> None:
+    def wait(self, deadline: float | None = None) -> None:
         import datetime as dt
 
         from sqlalchemy import text
@@ -70,6 +83,10 @@ class DbRateLimiter:
         from . import db
         eng = db.get_engine()
         with eng.begin() as conn:
+            if deadline is not None:
+                # Bound lock waits as well as network waits on PostgreSQL.
+                ms = max(1, int(min(remaining(deadline), 2.0) * 1000))
+                conn.execute(text("SELECT set_config('lock_timeout', :value, true)"), {"value": f"{ms}ms"})
             conn.execute(text(
                 "INSERT INTO rate_state (id, last_at) VALUES (1, :epoch) "
                 "ON CONFLICT (id) DO NOTHING"), {"epoch": dt.datetime(1970, 1, 1)})
@@ -78,6 +95,8 @@ class DbRateLimiter:
             now = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
             elapsed = (now - row.last_at).total_seconds()
             if elapsed < self.interval:
+                if self.interval - elapsed >= remaining(deadline):
+                    raise DeadlineReached()
                 time.sleep(self.interval - elapsed)
             conn.execute(text("UPDATE rate_state SET last_at = :now WHERE id = 1"),
                          {"now": dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)})
@@ -98,7 +117,15 @@ class RakutenClient:
         self.session = session or requests.Session()
         self.rate_limiter = rate_limiter or default_rate_limiter()
 
-    def search(self, api: str, params: dict[str, Any]) -> Optional[dict]:
+    def search(self, api: str, params: dict[str, Any], deadline: float | None = None) -> Optional[dict]:
+        from sqlalchemy.exc import SQLAlchemyError
+        try:
+            return self._search(api, params, deadline)
+        except (DeadlineReached, SQLAlchemyError):
+            logger.warning("%s: time budget or database lock exhausted", api)
+            return None
+
+    def _search(self, api: str, params: dict[str, Any], deadline: float | None) -> Optional[dict]:
         """1回の検索。成功時はレスポンスdict、恒久的失敗時はNone。"""
         url = ENDPOINTS[api]
         q: dict[str, Any] = {
@@ -119,12 +146,22 @@ class RakutenClient:
             headers["Origin"] = config.SITE_URL.rstrip("/")
             headers["Referer"] = config.SITE_URL
         for attempt in range(config.MAX_RETRIES):
-            self.rate_limiter.wait()
+            remaining(deadline)
+            if deadline is None:
+                self.rate_limiter.wait()
+            else:
+                self.rate_limiter.wait(deadline=deadline)
             try:
-                resp = self.session.get(url, params=q, timeout=30, headers=headers)
+                # A connect + read timeout must fit within the shared deadline.
+                allowance = min(8.0, remaining(deadline) / 2)
+                resp = self.session.get(url, params=q, timeout=(min(3.0, allowance), allowance), headers=headers)
             except requests.RequestException as exc:
                 logger.warning("%s: 接続エラー(%s) attempt=%d", api, exc, attempt + 1)
-                time.sleep(config.BACKOFF_BASE_SEC * (2 ** attempt))
+                if attempt + 1 < config.MAX_RETRIES:
+                    wait = config.BACKOFF_BASE_SEC * (2 ** attempt)
+                    if wait >= remaining(deadline):
+                        return None
+                    time.sleep(wait)
                 continue
 
             if resp.status_code == 200:
@@ -144,7 +181,10 @@ class RakutenClient:
             if resp.status_code in (429, 500, 503):
                 wait = config.BACKOFF_BASE_SEC * (2 ** attempt)
                 logger.warning("%s: HTTP %d retry in %.1fs", api, resp.status_code, wait)
-                time.sleep(wait)
+                if attempt + 1 < config.MAX_RETRIES:
+                    if wait >= remaining(deadline):
+                        return None
+                    time.sleep(wait)
                 continue
             logger.error("%s: 予期しないHTTP %d", api, resp.status_code)
             return None

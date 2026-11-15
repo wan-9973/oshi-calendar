@@ -27,10 +27,11 @@ from .. import config, db
 from ..entity_profiles import profile_for
 from ..calendar_service import month_calendar
 from ..crawler import run_once as crawl_run_once
-from ..dedupe import classify_media
+from ..dedupe import classify_media, _author_parts, name_variants
 from ..monitoring import health_snapshot, run_job
+from ..search_gate import acquire, release, key_for
 from ..retention import run_once as retention_run_once
-from ..search_service import find_or_create_oshi, save_results, search_all
+from ..search_service import find_or_create_oshi, save_results, search_all, queue_failed_apis
 
 # Vercel等のサーバーレスではレスポンス後にスレッドが生存しないため同期検索に切り替える
 SERVERLESS = bool(os.environ.get("VERCEL") or os.environ.get("OSHI_SYNC_SEARCH"))
@@ -97,7 +98,7 @@ def _not_noise():
 
 def _visible():
     """一覧・カレンダー表示に用いる共通の可視条件（購入可能かつ非ノイズ）。"""
-    return and_(_purchasable(), _not_noise())
+    return and_(_purchasable(), _not_noise(), db.Item.quality_excluded == 0)
 
 # --- 検索ジョブ（インメモリ） -------------------------------------------------
 _jobs: dict[str, dict] = {}
@@ -106,6 +107,8 @@ _ip_hits: dict[str, deque] = defaultdict(deque)
 
 
 def _rate_limited(ip: str) -> bool:
+    if SERVERLESS:
+        return not acquire(key_for("ip", ip), config.NEW_SEARCH_PER_IP_PER_MIN, 60)
     now = time.monotonic()
     q = _ip_hits[ip]
     while q and now - q[0] > 60:
@@ -130,6 +133,7 @@ def _run_search_job(job_id: str, name: str) -> None:
         if profile:
             _activate_profiled_oshi(oshi_id)
         save_results(oshi_id, result["records"])
+        queue_failed_apis(oshi_id, result["failed_apis"])
         with _jobs_lock:
             _jobs[job_id].update(status="done", oshi_id=oshi_id,
                                  failed_apis=result["failed_apis"])
@@ -175,6 +179,7 @@ def _card(item: db.Item, price_row: db.PriceCache | None) -> dict:
     else:
         relation_key, relation = "related", "出演・関連"
     card = {
+        "item_id": item.item_code,
         "title": item.title,
         "media": MEDIA_LABEL.get(media_key, media_key),
         "media_key": media_key,
@@ -183,7 +188,9 @@ def _card(item: db.Item, price_row: db.PriceCache | None) -> dict:
         "author": item.author_or_artist,
         "sales_date": item.sales_date,
         "sales_date_iso": item.sales_date_iso,
-        "sales_date_precision": item.sales_date_precision,
+        "sales_date_precision": ("approx_day" if item.sales_date_precision == "day"
+                                 and re.search("頃|以降", item.sales_date or "")
+                                 else item.sales_date_precision),
         "price": price,  # Noneなら「最新価格は楽天でご確認ください」
         # 価格の取得時刻は価格そのものに紐づける（商品メタの取得時刻とは別物）。
         "price_fetched_at": _fmt_utc(price_fetched_at),
@@ -222,6 +229,7 @@ def _cards_for(s, items: list[db.Item], oshi: db.Oshi | None = None) -> list[dic
         profile = profile_for(oshi.name)
         aliases = [*oshi.aliases, *((profile or {}).get("aliases") or [])]
         for card in cards:
+            _check_direct_relation(card, oshi.name, aliases)
             card["author"] = _display_author(card["author"], oshi.name, aliases)
             card["oshi_name"] = oshi.name
     else:
@@ -234,9 +242,17 @@ def _cards_for(s, items: list[db.Item], oshi: db.Oshi | None = None) -> list[dic
                 continue
             profile = profile_for(owner.name)
             aliases = [*owner.aliases, *((profile or {}).get("aliases") or [])]
+            _check_direct_relation(card, owner.name, aliases)
             card["author"] = _display_author(card["author"], owner.name, aliases)
             card["oshi_name"] = owner.name
     return cards
+
+
+def _check_direct_relation(card: dict, name: str, aliases: list[str]) -> None:
+    if card["relation_key"] == "direct" and not any(
+        value in _author_parts(card["author"]) for value in name_variants(name, aliases)
+    ):
+        card["relation_key"], card["relation"] = "related", "出演・関連"
 
 
 def _variation_key(title: str) -> str:
@@ -497,7 +513,12 @@ def sitemap(request: Request):
 # --- API ----------------------------------------------------------------------
 @app.post("/api/search")
 def api_search(request: Request, payload: dict):
-    name = (payload.get("name") or "").strip()
+    name = payload.get("name")
+    if not isinstance(name, str):
+        raise HTTPException(400, "推し名を入力してください")
+    name = name.strip()
+    profile = profile_for(name)
+    name = profile["canonical_name"] if profile else name
     if not name or len(name) > 100:
         raise HTTPException(400, "推し名を入力してください")
     with db.session() as s:
@@ -517,14 +538,23 @@ def api_search(request: Request, payload: dict):
         canonical = profile["canonical_name"] if profile else name
         aliases = profile["aliases"] if profile else []
         anchors = profile["anchors"] if profile else []
-        result = search_all(canonical, aliases, anchors)
-        if len(result["failed_apis"]) >= 8:
-            raise HTTPException(503, "一時的に取得できません")
-        oshi_id, _ = find_or_create_oshi(canonical, aliases)
-        if profile:
-            _activate_profiled_oshi(oshi_id)  # 非表示解除+旧キャッシュ破棄（非同期経路と同一の再公開処理）
-        save_results(oshi_id, result["records"])
-        return {"status": "done", "oshi_id": oshi_id}
+        lease = key_for("search", canonical)
+        if not acquire(lease, 1, 90):
+            raise HTTPException(429, "同じ名前を検索中です。少し待って再度お試しください。")
+        try:
+            result = search_all(canonical, aliases, anchors,
+                                deadline=time.monotonic() + config.REQUEST_WORK_SECONDS)
+            if len(result["failed_apis"]) >= result.get("total_requests", 8 * (1 + len(aliases))):
+                raise HTTPException(503, "一時的に取得できません")
+            oshi_id, _ = find_or_create_oshi(canonical, aliases)
+            if profile:
+                _activate_profiled_oshi(oshi_id)  # 非表示解除+旧キャッシュ破棄（非同期経路と同一の再公開処理）
+            save_results(oshi_id, result["records"])
+            queue_failed_apis(oshi_id, result["failed_apis"])
+            return {"status": "done", "oshi_id": oshi_id,
+                    "failed_apis": result["failed_apis"]}
+        finally:
+            release(lease)
     job_id = uuid.uuid4().hex
     with _jobs_lock:
         _jobs[job_id] = {"status": "running", "message": "検索を開始しています",
@@ -583,6 +613,7 @@ def api_oshi_calendar(
     y: int = Query(..., ge=1900, le=2200),
     m: int = Query(..., ge=1, le=12),
     limit: int = Query(48, ge=1, le=60),
+    offset: int = Query(0, ge=0, le=100000),
 ):
     """統合カレンダー用の月別読取API。localStorageの内容は保存・収集しない。"""
     with db.session() as s:
@@ -595,7 +626,7 @@ def api_oshi_calendar(
             db.Item.sales_date_iso.like(f"{y:04d}-{m:02d}%"),
         )
         total = query.count()
-        rows = query.order_by(db.Item.sales_date_iso.asc(), db.Item.id.asc()).limit(limit).all()
+        rows = query.order_by(db.Item.sales_date_iso.asc(), db.Item.id.asc()).offset(offset).limit(limit).all()
         cards = _cards_for(s, rows, oshi)
         return JSONResponse({
             "id": oshi.id,
@@ -604,7 +635,8 @@ def api_oshi_calendar(
             "month": m,
             "items": cards,
             "total": total,
-            "truncated": total > len(cards),
+            "truncated": total > offset + len(rows),
+            "next_offset": offset + len(rows),
         })
 
 

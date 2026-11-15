@@ -23,6 +23,7 @@
   <nav aria-label="メインナビゲーション"><a class="my-list-link" href="/my" data-analytics-event="select_navigation" data-target-id="my_list">マイ推しリスト</a></nav>
 </header>
 <main>
+  {% if request.query_params.get('partial') == '1' %}<p class="note" role="status">一部の情報を取得できませんでした。取得済みの情報を表示しています。残りは自動更新で再確認します。</p>{% endif %}
   <p class="affiliate-disclosure" role="note">商品リンクには楽天アフィリエイトリンクを使用しています。</p>
   {% block content %}{% endblock %}
 </main>
@@ -45,6 +46,6 @@
     </div>
   </div>
 </div>
-<script src="/static/app.js?v=20261012-analytics"></script>
+<script src="/static/app.js?v=20261115-quality"></script>
 </body>
 </html>

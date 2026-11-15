@@ -13,6 +13,13 @@ def _key(value: str) -> str:
 
 
 PROFILES = {
+    "eve": {
+        "canonical_name": "Eve", "aliases": [],
+        "anchors": ["Eve", "いのちの食べ方", "AIYOU"],
+    },
+    "m!lk": {
+        "canonical_name": "M!LK", "aliases": [], "anchors": ["M!LK"],
+    },
     "hana": {
         "canonical_name": "HANA",
         "aliases": [],

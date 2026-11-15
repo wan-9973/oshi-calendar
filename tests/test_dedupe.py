@@ -17,7 +17,8 @@ def test_normalize():
 
 
 def test_relevance_trusted_field():
-    assert relevance_score(rec(trusted_field_match=True), "米津玄師", []) == 1.0
+    assert relevance_score(rec(trusted_field_match=True, author_or_artist="米津玄師"), "米津玄師", []) == 1.0
+    assert relevance_score(rec(trusted_field_match=True), "米津玄師", []) == 0.0
 
 
 def test_relevance_title_and_caption():
@@ -46,7 +47,7 @@ def test_books_genre_prefix_exclusion(monkeypatch):
 
 
 def test_dedupe_by_isbn_prefers_trusted_and_physical():
-    a = rec(item_code="9784000000000", title="本A", trusted_field_match=True)
+    a = rec(item_code="9784000000000", title="本A", trusted_field_match=True, author_or_artist="米津玄師")
     b = rec(item_code="9784000000000", title="本A", source_api="ichiba",
             media="goods", caption="米津玄師")
     got = merge([b, a], "米津玄師", [])
@@ -128,7 +129,7 @@ def test_merge_drops_noise_records():
     score = rec(title="バンドスコア 米津玄師", item_code="s1", source_api="books_total",
                 media="mixed")
     ok = rec(title="LOST CORNER (通常盤)", item_code="9784000000001", media="cd",
-             source_api="books_cd", trusted_field_match=True)
+             source_api="books_cd", trusted_field_match=True, author_or_artist="米津玄師")
     got = merge([used, score, ok], "米津玄師", [])
     titles = [r["title"] for r in got]
     assert "LOST CORNER (通常盤)" in titles

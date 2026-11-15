@@ -50,6 +50,7 @@ class Item(Base):
     item_url = Column(Text, nullable=False)        # affiliateUrl（楽天ドメインのみ。R6）
     image_url = Column(Text, default="")
     relevance = Column(Float, default=0.0)
+    quality_excluded = Column(Integer, default=0, nullable=False)
     media = Column(String, default="")             # book/cd/dvd/magazine/game/ebook/goods
     availability = Column(Integer)                 # 在庫状況（NULL=不明。config.PURCHASABLE_AVAILABILITY参照）
     meta_fetched_at = Column(DateTime, default=utcnow)  # R3: 90日
@@ -71,12 +72,25 @@ class RateState(Base):
     last_at = Column(DateTime, default=dt.datetime(1970, 1, 1))
 
 
+class SearchGate(Base):
+    """Short-lived hashed request counters and search leases; no raw IP/name."""
+    __tablename__ = "search_gates"
+    key = Column(String, primary_key=True)
+    expires_at = Column(DateTime, nullable=False, index=True)
+    count = Column(Integer, nullable=False, default=0)
+
+
 class CrawlQueue(Base):
     __tablename__ = "crawl_queue"
     oshi_id = Column(Integer, ForeignKey("oshi.id", ondelete="CASCADE"), primary_key=True)
     next_crawl_at = Column(DateTime, default=utcnow, index=True)
     last_crawl_at = Column(DateTime)
     fail_count = Column(Integer, default=0)
+    pending_apis_json = Column(Text, default="[]", nullable=False)
+
+    @property
+    def pending_apis(self) -> list[str]:
+        return json.loads(self.pending_apis_json or "[]")
 
 
 class JobRun(Base):
@@ -138,6 +152,13 @@ def session():
 def _migrate(engine) -> None:
     """既存DBへの軽量マイグレーション（create_allは既存テーブルに列を追加しないため）。"""
     cols = {c["name"] for c in inspect(engine).get_columns("items")}
+    queue_cols = {c["name"] for c in inspect(engine).get_columns("crawl_queue")}
+    if "pending_apis_json" not in queue_cols:
+        with engine.begin() as con:
+            con.execute(text("ALTER TABLE crawl_queue ADD COLUMN pending_apis_json TEXT NOT NULL DEFAULT '[]'"))
+    if "quality_excluded" not in cols:
+        with engine.begin() as con:
+            con.execute(text("ALTER TABLE items ADD COLUMN quality_excluded INTEGER NOT NULL DEFAULT 0"))
     if "availability" not in cols:
         with engine.begin() as con:
             con.execute(text("ALTER TABLE items ADD COLUMN availability INTEGER"))

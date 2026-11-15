@@ -379,7 +379,8 @@ def test_search_progress_explains_stages_and_privacy(monkeypatch, tmp_path):
     assert "無料" in page and "ログイン不要" in page
     assert "登録情報はこの端末だけ" not in page
     assert 'id="search-detail"' in page
-    assert "取得できた媒体から結果を整理しています" in script
+    assert "複数の媒体を確認しています" in script
+    assert "var stages =" not in script
 
 
 def test_robots_and_sitemap_expose_public_pages_only(monkeypatch, tmp_path):
@@ -686,3 +687,56 @@ def test_postgres_url_uses_installed_psycopg2_driver(monkeypatch):
     import sqlalchemy
     engine = sqlalchemy.create_engine(db._default_url())
     assert engine.dialect.driver == "psycopg2"
+
+def test_calendar_pagination_keeps_all_items(monkeypatch, tmp_path):
+    client, _ = make_app(monkeypatch, tmp_path)
+    from src import db
+    with db.session() as s:
+        owner = db.Oshi(name='pagination')
+        s.add(owner)
+        s.flush()
+        oid = owner.id
+        for i in range(65):
+            s.add(db.Item(oshi_id=oid, source_api='books_cd', item_code=f'code-{i}',
+                          title=f'商品{i}', author_or_artist='pagination',
+                          item_url=f'https://books.rakuten.co.jp/{i}',
+                          sales_date_iso='2026-11-20', sales_date_precision='day'))
+        s.commit()
+    first = client.get(f'/api/oshi/{oid}/calendar?y=2026&m=11&limit=60').json()
+    second = client.get(f'/api/oshi/{oid}/calendar?y=2026&m=11&limit=60&offset={first["next_offset"]}').json()
+    assert first['total'] == 65 and first['truncated']
+    assert not second['truncated']
+    assert len({c['item_id'] for c in first['items'] + second['items']}) == 65
+
+
+def test_search_lease_released_after_failure(monkeypatch, tmp_path):
+    client, webapp = make_app(monkeypatch, tmp_path)
+    from src.search_gate import acquire, key_for
+    with patch.object(webapp, 'search_all', return_value={'records': [], 'failed_apis': ['x'] * 8}):
+        assert client.post('/api/search', json={'name': 'lease test'}).status_code == 503
+    assert acquire(key_for('search', 'lease test'), 1, 90)
+
+
+def test_cached_alias_does_not_repeat_external_search(monkeypatch, tmp_path):
+    client, webapp = make_app(monkeypatch, tmp_path)
+    from src.search_service import find_or_create_oshi
+    oid, _ = find_or_create_oshi('米津玄師')
+    with patch.object(webapp, 'search_all') as search:
+        result = client.post('/api/search', json={'name': '米津'})
+    assert result.json() == {'status': 'cached', 'oshi_id': oid}
+    search.assert_not_called()
+
+def test_approximate_day_is_not_exported_as_confirmed(monkeypatch, tmp_path):
+    client, _ = make_app(monkeypatch, tmp_path)
+    from src import db
+    with db.session() as s:
+        owner = db.Oshi(name='approx')
+        s.add(owner)
+        s.flush()
+        oid = owner.id
+        s.add(db.Item(oshi_id=oid, source_api='books_cd', item_code='approx',
+                      title='予定', author_or_artist='approx', item_url='https://books.rakuten.co.jp/x',
+                      sales_date='2026年11月20日頃', sales_date_iso='2026-11-20', sales_date_precision='day'))
+        s.commit()
+    card = client.get(f'/api/oshi/{oid}/calendar?y=2026&m=11').json()['items'][0]
+    assert card['sales_date_precision'] == 'approx_day'

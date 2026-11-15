@@ -53,6 +53,7 @@ def run_once(now: dt.datetime | None = None) -> dict:
         job_run_cutoff = now - dt.timedelta(days=config.JOB_RUN_TTL_DAYS)
         job_runs_deleted = s.query(db.JobRun) \
             .filter(db.JobRun.started_at < job_run_cutoff).delete()
+        s.query(db.SearchGate).filter(db.SearchGate.expires_at < now).delete()
         s.commit()
 
     stats = {"price_deleted": price_deleted, "meta_requeued": meta_requeued,
