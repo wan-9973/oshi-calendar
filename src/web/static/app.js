@@ -257,6 +257,7 @@
     var title = appendTextElement(body, "h3", "", card.title);
     title.title = card.title;
     if (card.author) appendTextElement(body, "p", "author", card.author);
+    if (card.relation_note) appendTextElement(body, "p", "note relation-note", card.relation_note);
 
     var details = document.createElement("div");
     details.className = "card-details";

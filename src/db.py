@@ -44,6 +44,7 @@ class Item(Base):
     item_code = Column(String, nullable=False, index=True)  # ISBN/JAN/itemCode
     title = Column(Text, nullable=False)
     author_or_artist = Column(Text, default="")
+    caption = Column(Text, default="", nullable=False)
     sales_date = Column(String, default="")        # 原文（表示用）
     sales_date_iso = Column(String, default="")    # ソート用 YYYY-MM-DD（近似）
     sales_date_precision = Column(String, default="")  # year/month/day/""
@@ -156,6 +157,10 @@ def _migrate(engine) -> None:
             # Gate hashes are internal state, never a public Data API resource.
             con.execute(text("ALTER TABLE search_gates ENABLE ROW LEVEL SECURITY"))
     cols = {c["name"] for c in inspect(engine).get_columns("items")}
+    if "caption" not in cols:
+        with engine.begin() as con:
+            optional = "IF NOT EXISTS " if engine.dialect.name == "postgresql" else ""
+            con.execute(text(f"ALTER TABLE items ADD COLUMN {optional}caption TEXT NOT NULL DEFAULT ''"))
     queue_cols = {c["name"] for c in inspect(engine).get_columns("crawl_queue")}
     if "pending_apis_json" not in queue_cols:
         with engine.begin() as con:

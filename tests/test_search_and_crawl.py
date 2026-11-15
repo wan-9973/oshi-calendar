@@ -82,6 +82,7 @@ def test_save_results_detects_new_items(test_db):
     with test_db.session() as s:
         pc = s.get(test_db.PriceCache, "9784111111111")
         assert pc.price == 1980
+        assert s.query(test_db.Item).filter_by(item_code="9784111111111").one().caption == BOOK["itemCaption"]
 
 
 def test_crawler_updates_queue_and_counts_new(test_db):

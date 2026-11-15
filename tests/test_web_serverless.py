@@ -740,3 +740,29 @@ def test_approximate_day_is_not_exported_as_confirmed(monkeypatch, tmp_path):
         s.commit()
     card = client.get(f'/api/oshi/{oid}/calendar?y=2026&m=11').json()['items'][0]
     assert card['sales_date_precision'] == 'approx_day'
+
+def test_broad_false_match_remains_visible_with_explicit_unverified_label(monkeypatch, tmp_path):
+    client, _ = make_app(monkeypatch, tmp_path)
+    from src import db
+    from src.search_service import find_or_create_oshi
+    oid, _ = find_or_create_oshi('Eve')
+    with db.session() as s:
+        s.add(db.Item(oshi_id=oid, source_api='books_game', item_code='everyday',
+                      title='うたのプリンス アクリルブロック Everyday Life', author_or_artist='メーカー',
+                      item_url='https://books.rakuten.co.jp/x', media='goods', relevance=.7,
+                      sales_date_iso='2026-11-25', sales_date_precision='day'))
+        s.add(db.Item(oshi_id=oid, source_api='books_cd', item_code='eve-real',
+                      title='AIYOU', author_or_artist='Eve',
+                      item_url='https://books.rakuten.co.jp/y', media='cd', relevance=1,
+                      sales_date_iso='2026-11-25', sales_date_precision='day'))
+        s.commit()
+    data=client.get(f'/api/oshi/{oid}/calendar?y=2026&m=11').json()
+    assert data['total'] == 2
+    false=next(c for c in data['items'] if c['item_id']=='everyday')
+    assert false['relation_key']=='unverified'
+    assert 'Eveとの関連は確認できていません' in false['relation_note']
+    real=next(c for c in data['items'] if c['item_id']=='eve-real')
+    assert real['relation_key']=='direct'
+    page=client.get(f'/oshi/{oid}?y=2026&m=11').text
+    assert 'Everyday Life' in page and '関連未確認' in page
+    assert 'data-relation-tab="unverified"' in page
