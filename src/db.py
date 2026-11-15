@@ -151,6 +151,10 @@ def session():
 
 def _migrate(engine) -> None:
     """既存DBへの軽量マイグレーション（create_allは既存テーブルに列を追加しないため）。"""
+    if engine.dialect.name == "postgresql":
+        with engine.begin() as con:
+            # Gate hashes are internal state, never a public Data API resource.
+            con.execute(text("ALTER TABLE search_gates ENABLE ROW LEVEL SECURITY"))
     cols = {c["name"] for c in inspect(engine).get_columns("items")}
     queue_cols = {c["name"] for c in inspect(engine).get_columns("crawl_queue")}
     if "pending_apis_json" not in queue_cols:

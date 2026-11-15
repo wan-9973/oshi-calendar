@@ -13,6 +13,16 @@ def _key(value: str) -> str:
 
 
 PROFILES = {
+    "関ジャニ∞": {
+        "canonical_name": "関ジャニ∞", "aliases": ["関ジャニ", "関ジャニ8"], "anchors": [],
+    },
+    "ミセスグリーンアップル": {
+        "canonical_name": "ミセスグリーンアップル",
+        "aliases": ["Mrs. GREEN APPLE"], "anchors": [],
+    },
+    "キンプリ": {
+        "canonical_name": "キンプリ", "aliases": ["King & Prince"], "anchors": [],
+    },
     "eve": {
         "canonical_name": "Eve", "aliases": [],
         "anchors": ["Eve", "いのちの食べ方", "AIYOU"],
