@@ -117,3 +117,14 @@ def test_additive_migration_preserves_existing_items(test_db):
     with db.session() as s:
         assert s.query(db.Item).one().quality_excluded == 0
         assert s.get(db.CrawlQueue, oid).pending_apis == []
+
+def test_formal_names_character_credits_and_collaborations():
+    from src.entity_profiles import profile_for
+    for name, author in [('キンプリ', 'King & Prince'), ('ミセスグリーンアップル', 'Mrs. GREEN APPLE')]:
+        profile = profile_for(name)
+        assert relevance_score({'author_or_artist': author}, name, profile['aliases']) == 1
+    assert relevance_score({'author_or_artist': '椎名林檎×斎藤ネコ'}, '椎名林檎', []) == 1
+    assert relevance_score({'author_or_artist': '真白(CV:花澤香菜)'}, '花澤香菜', []) == 1
+    assert relevance_score({'author_or_artist': '中野家の五つ子（花澤香菜・竹達彩奈）'}, '花澤香菜', []) == 1
+    assert relevance_score({'author_or_artist': 'ミッキー・ローク'}, 'ミッキー', []) == 0
+    assert relevance_score({'author_or_artist': 'Evelyn van Kelle'}, 'Eve', []) == 0

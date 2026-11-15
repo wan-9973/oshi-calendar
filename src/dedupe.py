@@ -47,7 +47,13 @@ def name_in_text(name: str, text: str) -> bool:
 
 def _author_parts(author_raw: str) -> list[str]:
     """複数名義（スラッシュ・カンマ区切り）を正規化して分割。"""
-    return [normalize(p) for p in re.split(r"[/,、，&＆]", author_raw or "") if normalize(p)]
+    raw = unicodedata.normalize("NFKC", author_raw or "")
+    # Ampersands and middle dots may belong to a band's/person's name.
+    parts = re.split(r"[/,、，×]", raw)
+    for group in re.findall(r"\(([^()]*)\)", raw):
+        group = re.sub(r"^\s*cv[.:：]?\s*", "", group, flags=re.I)
+        parts.extend(re.split(r"[・/,、]", group))
+    return [normalize(p) for p in parts if normalize(p)]
 
 
 def relevance_score(record: dict, name: str, aliases: list[str], anchors: list[str] | None = None) -> float:
