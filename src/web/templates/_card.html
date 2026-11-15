@@ -20,6 +20,6 @@
     </div>
   </div>
 </a>
-{% if show_calendar and c.sales_date_precision == "day" %}<button class="calendar-add-button" type="button" data-calendar-item data-title="{{ c.title }}" data-sales-date="{{ c.sales_date_iso }}" data-oshi-id="{{ c.oshi_id }}" data-oshi-name="{{ c.oshi_name }}" data-item-url="{{ c.url }}" aria-label="{{ c.title }}の発売日をカレンダーに追加">📅 カレンダーに追加</button>{% endif %}
+{% if show_calendar and c.sales_date_precision == "day" %}<button class="calendar-add-button" type="button" data-calendar-item data-item-id="{{ c.item_id }}" data-title="{{ c.title }}" data-sales-date="{{ c.sales_date_iso }}" data-oshi-id="{{ c.oshi_id }}" data-oshi-name="{{ c.oshi_name }}" data-item-url="{{ c.url }}" aria-label="{{ c.title }}の発売日をカレンダーに追加">📅 カレンダーに追加</button>{% endif %}
 </article>
 {%- endmacro %}

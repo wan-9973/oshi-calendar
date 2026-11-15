@@ -26,6 +26,8 @@ def parse_sales_date(raw: str) -> tuple[str, str]:
     day = int(m.group(3)) if m.group(3) else None
     if month is None:
         return f"{year:04d}-12-31", "year"
+    if not 1 <= month <= 12 or not 1 <= year <= 9999:
+        return "", ""
     if day is None:
         for word, d in _APPROX_DAY.items():
             if word in raw:

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
+import time
 from typing import Any, Callable, Optional
 
 from . import config, db
@@ -129,7 +130,8 @@ _MEDIA_LABEL = {"books_book": "書籍", "books_cd": "CD", "books_dvd": "DVD/Blu-
 def search_all(name: str, aliases: list[str] | None = None,
                anchors: list[str] | None = None,
                client: RakutenClient | None = None,
-               progress: ProgressCb = None) -> dict:
+               progress: ProgressCb = None, deadline: float | None = None,
+               only_apis: list[str] | None = None) -> dict:
     """全API直列検索。返り値: {'records': [...], 'failed_apis': [...]}"""
     aliases = (aliases or [])[: config.ALIAS_MAX]
     client = client or RakutenClient()
@@ -138,11 +140,16 @@ def search_all(name: str, aliases: list[str] | None = None,
     plans = []
     for q in [name, *aliases]:
         plans.extend(_plan(q))
+    if only_apis:
+        plans = [plan for plan in plans if plan[0] in only_apis]
     total = len(plans)
     for i, (api, media, params, trusted) in enumerate(plans):
+        if deadline is not None and time.monotonic() >= deadline:
+            failed.extend(p[0] for p in plans[i:])
+            break
         if progress:
             progress(f"{_MEDIA_LABEL[api]}を検索中", i, total)
-        resp = client.search(api, params)
+        resp = client.search(api, params, deadline=deadline) if deadline is not None else client.search(api, params)
         if resp is None:
             failed.append(api)
             continue  # 部分成功で継続（§12）
@@ -153,7 +160,8 @@ def search_all(name: str, aliases: list[str] | None = None,
     merged = merge(records, name, aliases, anchors or [])
     if progress:
         progress("完了", total, total)
-    return {"records": merged, "failed_apis": failed}
+    return {"records": merged, "failed_apis": failed, "total_requests": total,
+            "successful_requests": total - len(failed)}
 
 
 def save_results(oshi_id: int, merged: list[dict]) -> int:
@@ -182,6 +190,7 @@ def save_results(oshi_id: int, merged: list[dict]) -> int:
             row.item_url = rec["item_url"]
             row.image_url = rec["image_url"]
             row.relevance = rec["relevance"]
+            row.quality_excluded = 0
             row.availability = rec.get("availability")
             row.meta_fetched_at = now
             if rec.get("price") is not None:
@@ -190,6 +199,18 @@ def save_results(oshi_id: int, merged: list[dict]) -> int:
                                       fetched_at=now))
         s.commit()
     return new_count
+
+
+def queue_failed_apis(oshi_id: int, failed: list[str]) -> None:
+    """Continue only missing media after a bounded interactive search."""
+    import json
+    with db.session() as s:
+        queue = s.get(db.CrawlQueue, oshi_id)
+        if queue is not None:
+            queue.pending_apis_json = json.dumps(sorted(set(failed)))
+            if failed:
+                queue.next_crawl_at = db.utcnow()
+            s.commit()
 
 
 def find_or_create_oshi(name: str, aliases: list[str] | None = None) -> tuple[int, bool]:

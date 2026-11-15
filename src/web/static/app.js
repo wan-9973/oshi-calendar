@@ -116,7 +116,7 @@
       var oshiName = card.oshi_name || label || "推し";
       lines.push(
         "BEGIN:VEVENT",
-        "UID:oshi-" + (card.oshi_id || "item") + "-" + release + "-" + index + "@oshi-calendar",
+        "UID:oshi-" + (card.oshi_id || "item") + "-" + encodeURIComponent(card.item_id || card.url) + "@oshi-calendar",
         "DTSTAMP:" + stamp,
         "DTSTART;VALUE=DATE:" + release,
         "DTEND;VALUE=DATE:" + addOneDay(card.sales_date_iso),
@@ -127,7 +127,18 @@
       );
     });
     lines.push("END:VCALENDAR");
-    var blob = new Blob([lines.join("\r\n") + "\r\n"], { type: "text/calendar;charset=utf-8" });
+    // RFC 5545: fold at 75 UTF-8 octets, without splitting a character.
+    var folded = lines.map(function (line) {
+      var result = "", width = 0;
+      Array.from(line).forEach(function (character) {
+        var size = new TextEncoder().encode(character).length;
+        if (width + size > 75) { result += "\r\n "; width = 1; }
+        result += character;
+        width += size;
+      });
+      return result;
+    });
+    var blob = new Blob([folded.join("\r\n") + "\r\n"], { type: "text/calendar;charset=utf-8" });
     var url = URL.createObjectURL(blob);
     var link = document.createElement("a");
     link.href = url;
@@ -143,6 +154,23 @@
   function downloadIcs(card, oshiName) {
     downloadIcsCards([Object.assign({}, card, { oshi_name: card.oshi_name || oshiName })],
       card.sales_date_iso || "item", "item");
+  }
+
+  function fetchCalendarMonth(id, year, month) {
+    var items = [];
+    function page(offset) {
+      return fetch("/api/oshi/" + id + "/calendar?y=" + year + "&m=" + month + "&limit=60&offset=" + offset)
+        .then(function (response) { if (!response.ok) throw new Error(); return response.json(); })
+        .then(function (data) {
+          items = items.concat(data.items || []);
+          if (data.truncated) {
+            if (!Number.isInteger(data.next_offset) || data.next_offset <= offset) throw new Error();
+            return page(data.next_offset);
+          }
+          return { items: items, total: data.total, truncated: false };
+        });
+    }
+    return page(0);
   }
 
   function fetchOshiSummary(oshi) {
@@ -267,6 +295,7 @@
   document.querySelectorAll("[data-calendar-item]").forEach(function (button) {
     button.addEventListener("click", function () {
       downloadIcs({
+        item_id: button.dataset.itemId,
         title: button.dataset.title,
         sales_date_iso: button.dataset.salesDate,
         sales_date_precision: "day",
@@ -280,9 +309,8 @@
   if (monthCalendarDownload) {
     monthCalendarDownload.addEventListener("click", function () {
       monthCalendarDownload.disabled = true;
-      fetch("/api/oshi/" + monthCalendarDownload.dataset.oshiId + "/calendar?y=" +
-        monthCalendarDownload.dataset.year + "&m=" + monthCalendarDownload.dataset.month + "&limit=60")
-        .then(function (response) { if (!response.ok) throw new Error(); return response.json(); })
+      fetchCalendarMonth(monthCalendarDownload.dataset.oshiId,
+        monthCalendarDownload.dataset.year, monthCalendarDownload.dataset.month)
         .then(function (data) {
           downloadIcsCards(data.items || [], monthCalendarDownload.dataset.year + "-" + monthCalendarDownload.dataset.month, "oshi_month");
         })
@@ -339,20 +367,10 @@
       err.hidden = true;
       progress.hidden = false;
       setSearchLoading(true);
-      var stages = ["書籍を検索中", "CDを検索中", "DVD/Blu-rayを検索中", "雑誌を検索中",
-                    "ゲームを検索中", "電子書籍を検索中", "グッズを検索中", "結果をまとめています"];
-      var sim = 0;
-      bar.max = 8;
-      bar.value = 0;
-      msg.textContent = stages[0];
-      var simTimer = setInterval(function () {
-        if (sim < stages.length - 1) {
-          sim++;
-          bar.value = sim;
-          msg.textContent = stages[sim];
-          if (detail) detail.textContent = (sim + 1) + " / " + stages.length + " 段階。取得できた媒体から結果を整理しています。";
-        }
-      }, 1300);
+      bar.removeAttribute("value");
+      msg.textContent = "複数の媒体を確認しています";
+      if (detail) detail.textContent = "取得できた情報から表示します。混雑時は時間がかかる場合があります。";
+      var simTimer;
 
       var failSearch = function (message, reason) {
         track("search_error", { reason: reason || "unknown" });
@@ -376,7 +394,7 @@
         if (data.status === "cached" || data.status === "done") {
           track("search_complete", { result: data.status });
           showPageSkeleton();
-          location.href = "/oshi/" + data.oshi_id;
+          location.href = "/oshi/" + data.oshi_id + (data.failed_apis && data.failed_apis.length ? "?partial=1" : "");
           return;
         }
         var timer = setInterval(function () {
@@ -391,7 +409,7 @@
               clearInterval(timer);
               track("search_complete", { result: "job_done" });
               showPageSkeleton();
-              location.href = "/oshi/" + st.oshi_id;
+              location.href = "/oshi/" + st.oshi_id + (st.failed_apis && st.failed_apis.length ? "?partial=1" : "");
             }
             if (st.status === "error") {
               clearInterval(timer);
@@ -849,8 +867,7 @@
 
       var request = myCalendarCache[cacheKey] ? Promise.resolve(myCalendarCache[cacheKey]) :
         Promise.all(myCurrentList.map(function (oshi) {
-          return fetch("/api/oshi/" + oshi.id + "/calendar?y=" + parts[0] + "&m=" + parts[1] + "&limit=48")
-            .then(function (response) { if (!response.ok) throw new Error(); return response.json(); })
+          return fetchCalendarMonth(oshi.id, parts[0], parts[1])
             .catch(function () { return null; });
         })).then(function (responses) {
           myCalendarCache[cacheKey] = responses.filter(Boolean);
@@ -867,7 +884,7 @@
         renderCombinedTimeline(cards);
         document.getElementById("my-calendar-loading").hidden = true;
         myCalendarNote.textContent = cards.length + "件の供給を表示" +
-          (truncated ? "（一部の推しは48件まで）" : "") + "。リストはブラウザ内だけに保存されています。";
+          (truncated ? "（一部の情報を取得できませんでした）" : "") + "。リストはブラウザ内だけに保存されています。";
         myCalendar.setAttribute("aria-busy", "false");
       });
     };
@@ -924,9 +941,10 @@
         } else {
           var card = summary.upcoming && summary.upcoming[0];
           if (card) {
-            var remaining = daysUntil(card.sales_date_iso);
+            var remaining = card.sales_date_precision === "day" && !/頃|以降/.test(card.sales_date || "") ? daysUntil(card.sales_date_iso) : null;
             appendTextElement(section, "p", "supply-summary", "次の発売予定: " +
-              formatJapaneseDate(card.sales_date_iso) + (remaining === null ? "" : "（あと" + remaining + "日）"));
+              (remaining === null ? (card.sales_date || "日付未定") : formatJapaneseDate(card.sales_date_iso)) +
+              (remaining === null ? "（日付未確定）" : "（あと" + remaining + "日）"));
           } else {
             card = summary.latest_supply;
             appendTextElement(section, "p", "supply-summary", card && card.sales_month ?

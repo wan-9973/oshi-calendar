@@ -34,6 +34,17 @@ def name_variants(name: str, aliases: list[str]) -> list[str]:
     return [normalize(n) for n in [name, *aliases] if n and normalize(n)]
 
 
+def name_in_text(name: str, text: str) -> bool:
+    """Latin names must not match inside another word (Eve != Evelyn)."""
+    needle = normalize(name)
+    haystack = normalize(text)
+    if re.fullmatch(r"[a-z0-9!_-]+", needle):
+        # Keep word boundaries before removing spaces/punctuation.
+        haystack = unicodedata.normalize("NFKC", text or "").casefold()
+        return bool(re.search(r"(?<![a-z0-9])" + re.escape(needle) + r"(?![a-z0-9])", haystack))
+    return bool(needle and needle in haystack)
+
+
 def _author_parts(author_raw: str) -> list[str]:
     """複数名義（スラッシュ・カンマ区切り）を正規化して分割。"""
     return [normalize(p) for p in re.split(r"[/,、，&＆]", author_raw or "") if normalize(p)]
@@ -51,26 +62,18 @@ def relevance_score(record: dict, name: str, aliases: list[str], anchors: list[s
     author_raw = record.get("author_or_artist", "") or ""
     exact_author = any(v in _author_parts(author_raw) for v in variants)
     if anchors and not exact_author:
-        haystack = normalize(" ".join([
+        haystack = " ".join([
             record.get("title", ""), author_raw, record.get("caption", ""),
-        ]))
-        if not any(normalize(anchor) in haystack for anchor in anchors):
+        ])
+        if not any(name_in_text(anchor, haystack) for anchor in anchors):
             return 0.0
-    if record.get("trusted_field_match"):
-        # 曖昧名ではAPI側の曖昧一致を信用せず、完全一致のみを最高スコアにする
-        if not anchors or exact_author:
-            return config.SCORE_FIELD_MATCH
-    title = normalize(record.get("title", ""))
-    author = normalize(record.get("author_or_artist", ""))
-    caption = normalize(record.get("caption", ""))
-    for v in variants:
-        if v and (v in author):
-            return config.SCORE_FIELD_MATCH
-    for v in variants:
-        if v and v in title:
+    if exact_author:
+        return config.SCORE_FIELD_MATCH
+    for v in [name, *aliases]:
+        if name_in_text(v, record.get("title", "")):
             return config.SCORE_TITLE_MATCH
-    for v in variants:
-        if v and v in caption:
+    for v in [name, *aliases]:
+        if name_in_text(v, record.get("caption", "")):
             return config.SCORE_CAPTION_MATCH
     return 0.0
 

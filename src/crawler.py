@@ -7,11 +7,15 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
+import os
+import time
+import json
 
 from . import config, db
 from .entity_profiles import profile_for
 from .rakuten_client import RakutenClient
 from .search_service import requests_per_oshi, save_results, search_all
+from .quality import reclassify
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +44,8 @@ def run_once(budget: int | None = None, client: RakutenClient | None = None) -> 
     crawled = 0
     new_items_total = 0
     now = db.utcnow()
+    serverless = bool(os.environ.get("VERCEL") or os.environ.get("OSHI_SYNC_SEARCH"))
+    deadline = time.monotonic() + config.REQUEST_WORK_SECONDS if serverless else None
 
     with db.session() as s:
         total_oshi = s.query(db.Oshi).count()
@@ -57,6 +63,8 @@ def run_once(budget: int | None = None, client: RakutenClient | None = None) -> 
         due = s.query(db.CrawlQueue).filter(db.CrawlQueue.next_crawl_at <= now) \
                .order_by(db.CrawlQueue.next_crawl_at.asc()).all()
         for q in due:
+            if deadline is not None and time.monotonic() >= deadline:
+                break
             oshi = s.get(db.Oshi, q.oshi_id)
             if oshi is None:
                 s.delete(q)
@@ -67,26 +75,32 @@ def run_once(budget: int | None = None, client: RakutenClient | None = None) -> 
                 q.next_crawl_at = now + dt.timedelta(days=config.CRAWL_PERIOD_DAYS)
                 s.commit()
                 continue
-            cost = requests_per_oshi(len(oshi.aliases))
-            if used + cost > budget:
+            profile = profile_for(oshi.name)
+            aliases = profile["aliases"] if profile else oshi.aliases
+            cost = len(q.pending_apis) * (1 + min(len(aliases), config.ALIAS_MAX)) if q.pending_apis else requests_per_oshi(len(aliases))
+            if used + cost > budget and (used or not serverless):
                 logger.info("本日の予算上限に到達 used=%d", used)
                 break
-            profile = profile_for(oshi.name)  # 曖昧名は巡回でも共有プロファイルで絞り込む
-            aliases = profile["aliases"] if profile else oshi.aliases
             anchors = profile["anchors"] if profile else []
-            result = search_all(oshi.name, aliases, anchors, client=client)
+            result = search_all(oshi.name, aliases, anchors, client=client, deadline=deadline,
+                                only_apis=q.pending_apis)
+            q.pending_apis_json = json.dumps(sorted(set(result["failed_apis"])))
             used += cost
             crawled += 1
-            if len(result["failed_apis"]) >= 8:  # 全滅時のみ失敗扱い（§12）
+            if len(result["failed_apis"]) >= result.get("total_requests", cost):
                 q.fail_count += 1
                 q.next_crawl_at = now + dt.timedelta(hours=6 * min(q.fail_count, 4))
                 logger.error("巡回全滅: oshi=%s fail_count=%d", oshi.name, q.fail_count)
             else:
                 new_items = save_results(oshi.id, result["records"])
+                reclassify(apply=True, oshi_id=oshi.id)
                 new_items_total += new_items
                 q.fail_count = 0
                 q.last_crawl_at = db.utcnow()
                 q.next_crawl_at = db.utcnow() + dt.timedelta(days=_next_period_days(oshi.id, s))
+                if result["failed_apis"]:
+                    # Keep successful data, but do not wait 3-7 days to retry missing media.
+                    q.next_crawl_at = db.utcnow() + dt.timedelta(hours=1)
                 if new_items:
                     logger.info("新着 %d件: %s", new_items, oshi.name)
             s.commit()

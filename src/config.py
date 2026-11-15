@@ -18,7 +18,8 @@ SITE_URL = os.environ.get("SITE_URL", "")
 # Vercel Cron等からの呼び出し保護（VercelはCRON_SECRET設定時に自動でBearer送信）
 CRON_SECRET = os.environ.get("CRON_SECRET", "")
 # サーバーレス1回の巡回で使うリクエスト数（maxDuration内に収める）
-CRAWL_BUDGET_PER_RUN = int(os.environ.get("CRAWL_BUDGET_PER_RUN", "40"))
+CRAWL_BUDGET_PER_RUN = int(os.environ.get("CRAWL_BUDGET_PER_RUN", "24"))
+REQUEST_WORK_SECONDS = 45.0  # Reserve time for database writes before the 60s limit.
 # 日次ジョブがこの時間を超えて成功していなければヘルスチェックを degraded にする。
 # 24時間周期にGitHub Actions/Vercel Cronの実行遅延を少しだけ許容する。
 CRON_HEALTH_MAX_AGE_HOURS = int(os.environ.get("CRON_HEALTH_MAX_AGE_HOURS", "26"))
@@ -35,7 +36,7 @@ SITE_NAME = os.environ.get("SITE_NAME", "推しカレンダー")
 OPERATOR_NAME = os.environ.get("OPERATOR_NAME", "（運営者名を設定してください）")
 # プライバシーポリシーに載せる問い合わせ先（URLまたはメールアドレス。未設定なら項目ごと非表示）
 CONTACT = os.environ.get("CONTACT", "").strip()
-PRIVACY_POLICY_UPDATED = "2026年10月12日"
+PRIVACY_POLICY_UPDATED = "2026年11月15日"
 
 # --- アクセス解析（欲望観測所と同じ GA4 + Microsoft Clarity 構成） ---
 # IDは環境変数のみ。Vercelでは Production 環境にだけ設定する。
