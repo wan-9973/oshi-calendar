@@ -971,3 +971,284 @@ main {
   html { scroll-behavior: auto; }
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
+
+/* ===================================================================
+   ポップテーマ（2026-11）
+   既存レイアウトはそのまま、色・線・角丸・影・フォントだけを上書きする。
+   このブロックを削除すれば従来デザインに戻る。
+   =================================================================== */
+:root {
+  --bg: #FFF0F6;
+  --surface: #FFFFFF;
+  --surface-soft: #FFF7FA;
+  --accent: #FF8FC0;
+  --accent-hover: #FF7AB3;
+  --accent-strong: #B0185A;
+  --accent-soft: #FFE3EF;
+  --ink: #3A1F2B;
+  --muted: #6E4A5A;
+  --muted-soft: #9A7A88;
+  --line: #3A1F2B;
+  --sky: #8FD3FF;
+  --sky-soft: #CDEBFF;
+  --lemon: #FFE066;
+  --lemon-soft: #FFF2B3;
+  --lilac-soft: #E3D9FF;
+  --pop-border: 3px solid var(--ink);
+  --pop-border-thin: 2px solid var(--ink);
+  --card-radius: 24px;
+  --control-radius: 999px;
+  --shadow: 4px 4px 0 var(--ink);
+  --shadow-hover: 6px 6px 0 var(--ink);
+  --font-pop: "Mochiy Pop One", "M PLUS Rounded 1c", sans-serif;
+  --font-body: "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", "Hiragino Sans", sans-serif;
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--bg);
+  background-image: radial-gradient(#FFD1E4 2px, transparent 2px);
+  background-size: 28px 28px;
+}
+h1, h2 { font-family: var(--font-pop); font-weight: 400; letter-spacing: 0.01em; }
+h3 { font-family: var(--font-body); font-weight: 800; }
+a:not(.card):hover { color: var(--accent-strong); }
+:focus-visible { outline: 3px solid var(--sky); outline-offset: 3px; }
+
+/* ヘッダー */
+.site-header { background: rgba(255, 255, 255, 0.97); border-bottom: var(--pop-border); }
+.logo { color: var(--ink); font-family: var(--font-pop); font-weight: 400; font-size: 1.3rem; gap: 10px; }
+.logo .logo-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  font-size: 1rem;
+  color: var(--ink);
+  background: var(--accent);
+  border: var(--pop-border-thin);
+  border-radius: 13px;
+  transform: rotate(-6deg);
+}
+.logo:hover .logo-mark { transform: rotate(4deg); }
+.my-list-link,
+.my-list-link:hover {
+  color: var(--ink);
+  background: var(--surface);
+  border: var(--pop-border-thin);
+  box-shadow: 0 3px 0 var(--ink);
+}
+.my-list-link:hover { background: var(--lemon-soft); }
+
+.affiliate-disclosure { color: var(--muted); background: var(--surface); border: 2px dashed #E7A9C4; }
+
+/* ヒーロー */
+.hero-section {
+  overflow: visible;
+  background: var(--surface);
+  border: var(--pop-border);
+  border-radius: 36px;
+  box-shadow: 8px 8px 0 var(--sky);
+}
+.hero-section::before,
+.hero-section::after {
+  position: absolute;
+  z-index: 2;
+  width: 130px;
+  height: 30px;
+  content: "";
+  border-radius: 4px;
+  opacity: 0.9;
+}
+.hero-section::before { top: -15px; left: 48px; background: var(--sky); transform: rotate(-8deg); }
+.hero-section::after { top: -13px; right: 64px; bottom: auto; background: var(--lemon); transform: rotate(6deg); }
+.eyebrow { color: var(--accent-strong); font-weight: 800; letter-spacing: 0.06em; }
+.hero-section h1 { line-height: 1.5; }
+.trust-list li {
+  color: var(--ink);
+  background: var(--lemon);
+  border: var(--pop-border-thin);
+  font-weight: 800;
+}
+.trust-list li:nth-child(2) { background: var(--sky-soft); }
+
+/* 検索 */
+.search-form {
+  background: var(--surface-soft);
+  border: var(--pop-border);
+  border-radius: 999px;
+  box-shadow: none;
+}
+.search-form:focus-within { border-color: var(--ink); box-shadow: 0 0 0 4px var(--accent-soft); }
+.search-icon { color: var(--accent-strong); }
+.search-form input::placeholder { color: var(--muted-soft); }
+
+/* 主要ボタン：ピンクのステッカー風 */
+.search-form button,
+.favorite-button,
+.primary-link {
+  color: var(--ink);
+  background: var(--accent);
+  border: var(--pop-border-thin);
+  border-radius: 999px;
+  box-shadow: 0 4px 0 var(--ink);
+  font-weight: 800;
+}
+.search-form button:hover,
+.favorite-button:hover,
+.primary-link:hover {
+  color: var(--ink);
+  background: var(--accent-hover);
+  box-shadow: 0 6px 0 var(--ink);
+  transform: translateY(-2px);
+}
+.search-form button:active,
+.favorite-button:active,
+.primary-link:active { box-shadow: 0 1px 0 var(--ink); transform: translateY(3px); }
+.button-spinner { border-color: rgba(58, 31, 43, 0.3); border-top-color: var(--ink); }
+.favorite-button.is-active,
+.favorite-button.is-active:hover { color: var(--ink); background: var(--lemon); box-shadow: 0 4px 0 var(--ink); }
+.search-progress progress { accent-color: var(--accent-strong); }
+
+/* セクション見出し：ハートのシール */
+.section-title::before {
+  width: 1.1em;
+  height: 1.1em;
+  background: var(--accent);
+  border: var(--pop-border-thin);
+  border-radius: 50% 50% 4px 50%;
+  transform: rotate(45deg) scale(0.85);
+}
+.section-title span { font-family: var(--font-body); font-weight: 700; }
+.text-link { color: var(--accent-strong); font-weight: 800; }
+
+.personalized-section {
+  background: var(--surface);
+  border: var(--pop-border);
+  border-radius: 32px;
+  box-shadow: 8px 8px 0 var(--lemon);
+}
+
+/* 商品カード */
+.card {
+  border: var(--pop-border);
+  box-shadow: var(--shadow);
+}
+.card:hover { border-color: var(--ink); box-shadow: var(--shadow-hover); transform: translate(-2px, -2px); }
+.card-media { background: var(--accent-soft); border-bottom: var(--pop-border-thin); }
+.grid > .variation-group:nth-child(4n+2) .card-media { background: var(--sky-soft); }
+.grid > .variation-group:nth-child(4n+3) .card-media { background: var(--lemon-soft); }
+.grid > .variation-group:nth-child(4n+4) .card-media { background: var(--lilac-soft); }
+.image-placeholder { color: var(--muted); }
+.badge {
+  color: var(--ink);
+  background: var(--surface);
+  border: 1.5px solid var(--ink);
+  font-weight: 800;
+}
+.badge.new { color: var(--ink); background: var(--lemon); }
+.badge.oshi-chip { color: var(--ink); background: var(--accent-soft); }
+.badge.my-oshi-badge { color: #FFFFFF; background: var(--ink); }
+.badge.relation-direct { color: var(--ink); background: #D4F5E6; }
+.badge.relation-related { color: var(--ink); background: var(--lemon-soft); }
+.badge.relation-goods { color: var(--ink); background: var(--lilac-soft); }
+.upcoming-label { color: var(--ink); background: var(--sky-soft); border: 1.5px solid var(--ink); }
+.price { font-weight: 800; }
+
+.calendar-add-button,
+.secondary-button,
+.top-more > summary {
+  color: var(--ink);
+  background: var(--surface);
+  border: var(--pop-border-thin);
+  border-radius: 999px;
+  box-shadow: 0 3px 0 var(--ink);
+  font-weight: 800;
+}
+.calendar-add-button:hover,
+.secondary-button:hover { color: var(--ink); background: var(--sky-soft); box-shadow: 0 3px 0 var(--ink); }
+.top-more > summary:hover { background: var(--lemon-soft); }
+.variations { background: var(--surface-soft); border: 2px dashed #E7A9C4; border-radius: 20px; }
+.variations summary { color: var(--accent-strong); }
+
+/* 推しページ・カレンダー */
+.oshi-hero { border: var(--pop-border); border-radius: 32px; box-shadow: 8px 8px 0 var(--accent); }
+.calendar-notice { color: var(--ink); background: var(--lemon-soft); border: var(--pop-border-thin); border-radius: 20px; }
+.calendar-toolbar { background: rgba(255, 255, 255, 0.96); border: var(--pop-border); }
+.month-button { border: var(--pop-border-thin); border-radius: 999px; }
+.month-button:hover { color: var(--ink); background: var(--accent-soft); border-color: var(--ink); }
+.month-button.disabled { background: #F4EAEE; border-color: var(--muted-soft); }
+.tab,
+.relation-tab { border: var(--pop-border-thin); font-weight: 700; }
+.tab:hover:not(:disabled),
+.relation-tab:hover:not(:disabled) { color: var(--ink); background: var(--accent-soft); border-color: var(--ink); }
+.tab.active,
+.relation-tab.active { color: var(--ink); background: var(--accent); border-color: var(--ink); box-shadow: 0 3px 0 var(--ink); }
+.tab:disabled,
+.relation-tab:disabled { border-color: var(--muted-soft); }
+.count-badge { background: rgba(58, 31, 43, 0.1); }
+.filter-panel-toggle,
+.filter-panel-close { color: var(--ink); background: var(--accent-soft); border: var(--pop-border-thin); border-radius: 999px; }
+.filter-panel-toggle:hover,
+.filter-panel-close:hover { color: var(--ink); background: var(--accent); }
+.timeline::before { width: 0; background: none; border-left: 3px dashed var(--accent); }
+.timeline-dot { background: var(--accent); border: 3px solid var(--ink); box-shadow: none; }
+
+/* マイ推しリスト */
+.my-oshi-card { border: var(--pop-border); border-radius: 28px; box-shadow: var(--shadow); }
+.my-list > .my-oshi-card:nth-child(3n+1) { box-shadow: 6px 6px 0 var(--accent); }
+.my-list > .my-oshi-card:nth-child(3n+2) { box-shadow: 6px 6px 0 var(--sky); }
+.my-list > .my-oshi-card:nth-child(3n) { box-shadow: 6px 6px 0 var(--lemon); }
+.icon-button,
+.remove-button { background: var(--surface); border: var(--pop-border-thin); border-radius: 999px; }
+.icon-button:hover,
+.remove-button:hover { color: var(--ink); background: var(--accent-soft); border-color: var(--ink); }
+.remove-button { color: #9B1C47; }
+.summary li { background: var(--surface-soft); border: 1.5px solid #E7A9C4; border-radius: 16px; }
+
+.empty-state { border: 3px dashed #E7A9C4; border-radius: 28px; }
+.error { color: #A3133F; }
+
+/* フッター */
+.site-footer { color: #FFE3EF; background: var(--ink); border-top: 0; }
+.site-footer .operator,
+.site-footer .affiliate-note { color: #FFFFFF; }
+.site-footer .policy-link a,
+.site-footer a { color: #FFFFFF; text-decoration: underline; text-underline-offset: 3px; }
+.site-footer a:hover { color: var(--lemon); }
+
+.back-to-top { color: var(--ink); background: var(--accent); border: var(--pop-border-thin); box-shadow: 0 4px 0 var(--ink); }
+.toast { color: #FFFFFF; background: var(--ink); border-radius: 20px; }
+.skeleton-card { border: 2px solid #F4C6DA; box-shadow: none; }
+.skeleton-image, .skeleton-line { background: #FBE1EC; }
+
+.policy-page a { color: var(--accent-strong); }
+.policy-table-wrap { border: var(--pop-border-thin); border-radius: 20px; }
+.policy-table th, .policy-table td { border-bottom-color: #F1C9DA; }
+.policy-table th { color: var(--ink); background: var(--accent-soft); }
+
+@media (max-width: 600px) {
+  .logo { font-size: 1rem; gap: 6px; }
+  .logo .logo-mark { width: 32px; height: 32px; border-radius: 10px; }
+  .logo .logo-mark svg { width: 20px; height: 20px; }
+  .hero-section { border-radius: 26px; box-shadow: 5px 5px 0 var(--sky); }
+  .hero-section::before { left: 24px; width: 96px; height: 24px; }
+  .hero-section::after { right: 28px; width: 90px; height: 24px; }
+  .card { border-radius: 20px; }
+  .card-media { border-right: var(--pop-border-thin); border-bottom: var(--pop-border-thin); border-radius: 17px 0 16px 0; }
+  .personalized-section,
+  .oshi-hero { border-radius: 26px; box-shadow: 5px 5px 0 var(--lemon); }
+  .calendar-toolbar { border-right: 0; border-left: 0; }
+  .calendar-filter-panel,
+  .calendar-toolbar.is-compact:not(.filter-panel-open) .calendar-filter-panel { border: var(--pop-border); border-bottom: 0; }
+}
+
+/* Mochiy Pop One は字幅が広いため、PCの見出しを少し小さくして1文字だけの改行を防ぐ */
+@media (min-width: 901px) {
+  .hero-section h1 { font-size: clamp(1.7rem, 2.4vw, 2.15rem); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logo:hover .logo-mark { transform: rotate(-6deg); }
+}
