@@ -11,16 +11,16 @@
   <meta property="og:title" content="{{ self.title() | striptags }}">
   <meta property="og:description" content="{{ self.description() | striptags }}">
   <meta property="og:url" content="{{ request.url }}">
-  <meta name="theme-color" content="#FBF9F7">
+  <meta name="theme-color" content="#FFF0F6">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&amp;family=Zen+Maru+Gothic:wght@500;700&amp;display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/style.css?v=20261012-privacy">
+  <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800&amp;family=Mochiy+Pop+One&amp;display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css?v=20261122-pop">
   {% if analytics.enabled %}<script defer src="/static/analytics.js?v=1" data-analytics-schema-version="{{ analytics.schema_version }}"{% if analytics.ga_measurement_id %} data-ga-measurement-id="{{ analytics.ga_measurement_id }}"{% endif %}{% if analytics.clarity_project_id %} data-clarity-project-id="{{ analytics.clarity_project_id }}"{% endif %}></script>{% endif %}
 </head>
 <body data-analytics-page-type="{% block page_type %}other{% endblock %}">
 <header class="site-header">
-  <a class="logo" href="/" data-analytics-event="select_navigation" data-target-id="logo" aria-label="{{ site_name }} トップへ"><span aria-hidden="true">🗓️</span>{{ site_name }}</a>
+  <a class="logo" href="/" data-analytics-event="select_navigation" data-target-id="logo" aria-label="{{ site_name }} トップへ"><span class="logo-mark" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" focusable="false"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M12 18.5l-2.2-2a1.4 1.4 0 0 1 2.2-1.7 1.4 1.4 0 0 1 2.2 1.7z" fill="currentColor"/></svg></span>{{ site_name }}</a>
   <nav aria-label="メインナビゲーション"><a class="my-list-link" href="/my" data-analytics-event="select_navigation" data-target-id="my_list">マイ推しリスト</a></nav>
 </header>
 <main>
